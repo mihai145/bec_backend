@@ -21,7 +21,7 @@ RUN cargo build --release
 
 
 # runtime
-FROM rust:alpine3.17
+FROM alpine:3.17.2
 
 COPY --from=builer /app/target /app
 WORKDIR /app
