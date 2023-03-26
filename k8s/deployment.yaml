@@ -27,13 +27,14 @@ metadata:
   annotations:
     kubernetes.digitalocean.com/load-balancer-id: "bec-backend-load-balancer"
     service.beta.kubernetes.io/do-loadbalancer-size-unit: "1"
+    service.beta.kubernetes.io/do-loadbalancer-certificate-id: "327c3e5a-aa3a-4d4e-8d26-e85f1cc7b605"
     service.beta.kubernetes.io/do-loadbalancer-disable-lets-encrypt-dns-records: "false"
 spec:
   type: LoadBalancer
   selector:
     app: bec-backend
   ports:
-    - name: http
+    - name: https
       protocol: TCP
-      port: 8000
+      port: 443
       targetPort: 8000 
