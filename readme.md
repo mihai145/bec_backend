@@ -6,4 +6,4 @@ Push image: ```docker push registry.digitalocean.com/bec-registry/bec_backend:0.
 
 Run image (local): ```docker run -p 8000:8000 -d registry.digitalocean.com/bec-registry/bec_backend:0.0.1```
 
-Deploy: ```kubectl deploy k8s/deployment.yaml```
+Deploy: ```kubectl apply -f k8s/deployment.yaml```

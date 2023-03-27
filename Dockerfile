@@ -9,7 +9,7 @@ RUN cargo chef cook --release --recipe-path recipe.json
 
 
 # build app
-FROM rust:alpine3.17 as builer
+FROM rust:alpine3.17 as builder
 RUN apk add musl-dev
 
 WORKDIR /app
@@ -23,7 +23,7 @@ RUN cargo build --release
 # runtime
 FROM alpine:3.17.2
 
-COPY --from=builer /app/target /app
+COPY --from=builder /app/target /app
 WORKDIR /app
 
 ENV ROCKET_ADDRESS=0.0.0.0
