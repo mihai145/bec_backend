@@ -17,6 +17,7 @@ spec:
       containers:
       - name: bec-backend
         image: registry.digitalocean.com/bec-registry/bec_backend:0.0.1
+        imagePullPolicy: Always
         ports:
         - containerPort: 8000
 ---
