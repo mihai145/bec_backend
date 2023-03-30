@@ -1,6 +1,8 @@
 # build dependencies
 FROM rust:alpine3.17 as cacher
 RUN apk add musl-dev
+RUN apk add libressl-dev
+RUN rustup default nightly
 RUN cargo install cargo-chef
 
 WORKDIR /app
@@ -11,6 +13,8 @@ RUN cargo chef cook --release --recipe-path recipe.json
 # build app
 FROM rust:alpine3.17 as builder
 RUN apk add musl-dev
+RUN apk add libressl-dev
+RUN rustup default nightly
 
 WORKDIR /app
 COPY . .
@@ -21,7 +25,7 @@ RUN cargo build --release
 
 
 # runtime
-FROM alpine:3.17.2
+FROM alpine:3.17
 
 COPY --from=builder /app/target /app
 WORKDIR /app
