@@ -17,6 +17,9 @@ pub async fn search_movie_name(body: Json<model::movie::MovieNameSearchRequest>)
     match api_result.json::<model::movie::MovieSearchResultAPI>().await {
         Ok(parsed) => {
             let mut movies = parsed.results;
+            
+            movies = movies.iter().filter(|x| x.overview.len() > 0).cloned().collect();
+
             for movie in &mut movies {
                 augment_image_paths_movie(movie);
             }
@@ -63,6 +66,11 @@ pub async fn search_actor_name(body: Json<model::actor::ActorNameSearchRequest>)
     match api_result.json::<model::actor::ActorSearchResultApi>().await {
         Ok(parsed) => {
             let mut actors = parsed.results;
+
+            actors = actors.iter().filter(|x| x.known_for.len() > 0 
+                            && x.name.len() > 0 
+                            && x.name.chars().all(|c| !c.is_ascii_digit())).cloned().collect();
+
             for actor in &mut actors {
                 for movie in &mut actor.known_for {
                     augment_image_paths_known_for(movie);
