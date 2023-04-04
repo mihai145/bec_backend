@@ -21,6 +21,10 @@ fn rocket() -> _ {
                                                         apis::themoviedb::search_actor_id,
                                                         apis::themoviedb::get_genres,
                                                         apis::themoviedb::get_trending])
+                    .mount(apis::routes::ROOT, routes![apis::bec::am_i_logged_in])
                     .register(apis::routes::ROOT, catchers![apis::catchers::unprocessable_content,
+                                                            apis::catchers::bad_request,
+                                                            apis::catchers::unauthorized,
+                                                            apis::catchers::internal_server_error,
                                                             apis::catchers::not_found])
 }

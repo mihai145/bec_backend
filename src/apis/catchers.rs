@@ -17,6 +17,24 @@ pub fn unprocessable_content(req: &Request) -> (Status, (ContentType, String)) {
     }
 }
 
+#[catch(400)]
+pub fn bad_request(req: &Request) -> (Status, (ContentType, String)) {
+    (Status::BadRequest, (ContentType::JSON, 
+        json!(model::error::Error{
+            ok: false,
+            reason: String::from(req.uri().to_string() + " Bad request. Might be missing the bearer token")
+    }).to_string()))
+}
+
+#[catch(401)]
+pub fn unauthorized(req: &Request) -> (Status, (ContentType, String)) {
+    (Status::Unauthorized, (ContentType::JSON, 
+        json!(model::error::Error{
+            ok: false,
+            reason: String::from(req.uri().to_string() + " Unauthorized")
+    }).to_string()))
+}
+
 #[catch(404)]
 pub fn not_found(req: &Request) -> (Status, (ContentType, String)) {
     let req_uri = req.uri();
@@ -26,6 +44,15 @@ pub fn not_found(req: &Request) -> (Status, (ContentType, String)) {
         reason: String::from(format!("Path {req_method} {req_uri} does not exist"))
     }).to_string();
     (Status::NotFound, (ContentType::JSON, error_response))
+}
+
+#[catch(500)]
+pub fn internal_server_error(req: &Request) -> (Status, (ContentType, String)) {
+    (Status::InternalServerError, (ContentType::JSON, 
+        json!(model::error::Error{
+            ok: false,
+            reason: String::from(req.uri().to_string() + " Internal server error")
+    }).to_string()))
 }
 
 // Return a generic error when the body of the request cannot be parsed
