@@ -29,8 +29,6 @@ pub struct Claims {
     #[serde(rename = "updated_at")]
     pub updated_at: String,
     pub email: String,
-    #[serde(rename = "email_verified")]
-    pub email_verified: bool,
     pub iss: String,
     pub aud: String,
     pub iat: i64,

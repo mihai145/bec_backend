@@ -32,8 +32,6 @@ impl<'r> FromRequest<'r> for Bearer<'r> {
         match req.headers().get_one("bearer") {
             None => Outcome::Failure((Status::BadRequest, BearerError::Missing)),
             Some(bearer) => {
-                print!("{}", bearer);
-
                 // Should cache the public key... But HOW? I gave up, Rust won
                 let public_key = get_public_key().await;
                 let (n, e);
