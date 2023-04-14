@@ -75,6 +75,7 @@ pub async fn search_actor_name(body: Json<model::actor::ActorNameSearchRequest>)
                 for movie in &mut actor.known_for {
                     augment_image_paths_known_for(movie);
                 }
+                augment_profile_path_actor(actor);
             }
 
             success_response(json!(model::actor::ActorNameSearchResponse{
@@ -95,7 +96,9 @@ pub async fn search_actor_id(body: Json<model::actor::ActorIdSearchRequest>) -> 
             .await.unwrap();
     
     match api_result.json::<model::actor::DetailedActor>().await {
-        Ok(parsed) => {
+        Ok(mut parsed) => {
+            augment_profile_path_detailed_actor(&mut parsed);
+
             success_response(json!(model::actor::ActorIdSearchResponse{
                 ok: true,
                 result: parsed
@@ -194,6 +197,20 @@ fn augment_image_paths_trending_movie(movie: &mut model::genre::TrendingMovie) {
     match &movie.poster_path {
         Some(path) => movie.poster_path = Some([MOVIE_DB_IMAGE_PREFIX, &path].join("")),
         None => movie.poster_path = Some(String::from(""))
+    }
+}
+
+fn augment_profile_path_actor(actor: &mut model::actor::Actor) {
+    match &actor.profile_path {
+        Some(path) => actor.profile_path = Some([MOVIE_DB_IMAGE_PREFIX, &path].join("")),
+        None => actor.profile_path = Some(String::from(""))
+    }
+}
+
+fn augment_profile_path_detailed_actor(actor: &mut model::actor::DetailedActor) {
+    match &actor.profile_path {
+        Some(path) => actor.profile_path = Some([MOVIE_DB_IMAGE_PREFIX, &path].join("")),
+        None => actor.profile_path = Some(String::from(""))
     }
 }
 

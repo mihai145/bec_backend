@@ -99,5 +99,5 @@ pub struct DetailedActor {
     pub place_of_birth: String,
     pub popularity: f64,
     #[serde(rename = "profile_path")]
-    pub profile_path: String,
+    pub profile_path: Option<String>,
 }
