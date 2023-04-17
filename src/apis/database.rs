@@ -2,9 +2,10 @@ use sqlx::{postgres::PgPoolOptions};
 use crate::apis::model;
 use rocket::http::{Status, ContentType};
 use serde_json::json;
+use rocket::serde::json::Json;
 
-#[get("/users")]
-pub async fn get_users() -> (Status, (ContentType, String)) {
+#[post("/search/nickname", format="json", data="<body>")]
+pub async fn get_users(body: Json<model::user::UserNameSearchRequest>) -> (Status, (ContentType, String)) {
     dotenv::dotenv().expect("Unable to load environment variables from .env file");
     let db_url = std::env::var("DATABASE_URL").expect("Unable to read DATABASE_URL env var");
     let pool = PgPoolOptions::new()
@@ -12,27 +13,11 @@ pub async fn get_users() -> (Status, (ContentType, String)) {
     .connect(&db_url)
     .await.expect("Unable to connect to Postgres");
 
-
-    // let url = "postgres://doadmin:AVNS_2h3CfD61P1Ta8u2923d@db-postgresql-fra1-82985-do-user-13782354-0.b.db.ondigitalocean.com:25060/defaultdb";
-    // let conn = sqlx::postgres::PgConnection::connect(url).await;
-    
-    // let row = query.fetch_one(conn).await;
-    // let user = model::user::User {
-    //              id: row.get("id"),
-    //              nickname: row.get("nickname"),
-    //              email: row.get("email"),
-    //          };
-    // let results = rows.iter().map(|row| {
-    //     model::user::User {
-    //         id: row.get("id"),
-    //         nickname: row.get("nickname"),
-    //         email: row.get("email"),
-    //     }
-    // }).collect();
-
+    let nickname = format!("{}{}{}", '%', &body.user_name, '%');
     let users = sqlx::query_as!(
         model::user::User,
-        r#"SELECT nickname AS "nickname!", email AS "email!" FROM users"#,
+        r#"SELECT nickname AS "nickname!", email AS "email!" FROM users WHERE nickname LIKE $1"#,
+        nickname
         ).fetch_all(&pool).await.unwrap_or_else(|e| {
             error!("Couldn't fetch data! {}", e);
             Vec::new()

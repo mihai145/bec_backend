@@ -14,6 +14,13 @@ pub struct UsersResultQuery {
     pub users: Vec<User>,
 }
 
+// Received from client
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserNameSearchRequest {
+    pub user_name: String,
+}
+
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct User {
