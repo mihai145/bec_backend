@@ -1,3 +1,4 @@
+
 [package]
 name = "bec_backend"
 version = "0.1.0"
@@ -12,6 +13,9 @@ tokio = { version = "1.12.0", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 jsonwebtoken = "8"
+sqlx = { version = "0.6", features = ["postgres", "runtime-tokio-rustls", "macros", "uuid"]}
+dotenv = "0.15.0"
+uuid = { version = "0.8.1", features = ["serde", "v4"] }
 
 [dependencies.rocket]
 version = "0.5.0-rc.1"

@@ -28,6 +28,7 @@ RUN cargo build --release
 FROM alpine:3.17
 
 COPY --from=builder /app/target /app
+COPY --from=builder /app/.env /app
 WORKDIR /app
 
 ENV ROCKET_ADDRESS=0.0.0.0

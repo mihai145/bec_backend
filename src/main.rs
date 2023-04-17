@@ -22,6 +22,7 @@ fn rocket() -> _ {
                                                         apis::themoviedb::get_genres,
                                                         apis::themoviedb::get_trending])
                     .mount(apis::routes::ROOT, routes![apis::bec::am_i_logged_in])
+                    .mount(apis::routes::ROOT, routes![apis::database::get_users])
                     .register(apis::routes::ROOT, catchers![apis::catchers::unprocessable_content,
                                                             apis::catchers::bad_request,
                                                             apis::catchers::unauthorized,
