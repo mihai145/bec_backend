@@ -24,6 +24,35 @@ pub struct UserNameSearchRequest {
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct User {
+    pub id: i32,
     pub nickname: String,
     pub email: String,
+}
+
+// Returned to client
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AmIFollowingResponse {
+    pub ok: bool,
+    pub following: bool
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DbCount {
+    pub cnt: i64
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DbInt {
+    pub cnt: i32
+}
+
+// Received from client
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FollowRequest {
+    pub follower_id: i32,
+    pub followee_id: i32
 }

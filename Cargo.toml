@@ -15,7 +15,8 @@ serde_json = "1.0"
 jsonwebtoken = "8"
 sqlx = { version = "0.6", features = ["postgres", "runtime-tokio-rustls", "macros", "uuid"]}
 dotenv = "0.15.0"
-uuid = { version = "0.8.1", features = ["serde", "v4"] }
+lazy_static = "1.4.0"
+async_once = "0.2.6"
 
 [dependencies.rocket]
 version = "0.5.0-rc.1"

@@ -5,17 +5,9 @@ use jsonwebtoken::{decode, Algorithm, Validation, DecodingKey};
 
 use crate::apis::auth::models;
 
-async fn get_public_key() -> Option<models::Key> {
-    let response = reqwest
-        ::get("https://dev-jc1flmgwmyky8n0k.us.auth0.com/.well-known/jwks.json")
-        .await.unwrap();
+use super::public_key::AUTH0_PKEY;
 
-    match response.json::<models::PublicKey>().await {
-        Ok(res) => Some(res.keys[0].clone()),
-        Err(_) => None
-    }
-}
-
+#[derive(Debug)]
 pub struct Bearer<'r>(&'r str);
 
 #[derive(Debug)]
@@ -32,14 +24,13 @@ impl<'r> FromRequest<'r> for Bearer<'r> {
         match req.headers().get_one("bearer") {
             None => Outcome::Failure((Status::BadRequest, BearerError::Missing)),
             Some(bearer) => {
-                // Should cache the public key... But HOW? I gave up, Rust won
-                let public_key = get_public_key().await;
+                let public_key = AUTH0_PKEY.get().await;
                 let (n, e);
 
                 match public_key {
                     Some(key) => {
-                        n = key.n;
-                        e = key.e;
+                        n = key.n.clone();
+                        e = key.e.clone();
                     }
                     None => {
                         print!("Error while getting the public key");
@@ -61,6 +52,39 @@ impl<'r> FromRequest<'r> for Bearer<'r> {
                     }
                 }
             }
+        }
+    }
+}
+
+pub async fn match_sub(bearer: Bearer<'_>, id: i32) -> bool {
+    let public_key = AUTH0_PKEY.get().await;
+    let (n, e);
+
+    match public_key {
+        Some(key) => {
+            n = key.n.clone();
+            e = key.e.clone();
+        }
+        None => {
+            print!("Error while getting the public key");
+            return false;
+        }
+    }
+
+    let token = decode::<models::Claims>(&bearer.0, 
+        &DecodingKey::from_rsa_components(n.as_ref(), e.as_ref()).unwrap(), 
+        &Validation::new(Algorithm::RS256));
+
+    match token {
+        Ok(token) => {
+            if token.claims.sub.strip_prefix("auth0|").unwrap() == id.to_string() {
+                return true
+            }
+            return false
+        }
+        Err(e) => {
+            print!("{}", e);
+            return false
         }
     }
 }

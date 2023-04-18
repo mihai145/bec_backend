@@ -82,6 +82,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "async_once"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ce4f10ea3abcd6617873bae9f91d1c5332b4a778bd9ce34d0cd517474c1de82"
+
+[[package]]
 name = "atoi"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -138,16 +144,17 @@ checksum = "a4a4ddaa51a5bc52a6948f74c06d20aaaddb71924eab79b8c97a8c556e942d6a"
 name = "bec_backend"
 version = "0.1.0"
 dependencies = [
+ "async_once",
  "dotenv",
  "futures",
  "jsonwebtoken",
+ "lazy_static",
  "reqwest",
  "rocket",
  "serde",
  "serde_json",
  "sqlx",
  "tokio",
- "uuid 0.8.2",
 ]
 
 [[package]]
@@ -1715,7 +1722,7 @@ dependencies = [
  "thiserror",
  "tokio-stream",
  "url",
- "uuid 1.3.1",
+ "uuid",
  "webpki-roots",
  "whoami",
 ]
@@ -2130,16 +2137,6 @@ dependencies = [
  "form_urlencoded",
  "idna",
  "percent-encoding",
-]
-
-[[package]]
-name = "uuid"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
-dependencies = [
- "getrandom",
- "serde",
 ]
 
 [[package]]
