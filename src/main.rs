@@ -26,7 +26,13 @@ fn rocket() -> _ {
                     .mount(apis::routes::ROOT, routes![apis::database::get_users,
                                                         apis::database::am_i_following,
                                                         apis::database::follow,
-                                                        apis::database::unfollow])
+                                                        apis::database::unfollow,
+                                                        apis::database::posts,
+                                                        apis::database::did_i_review,
+                                                        apis::database::post,
+                                                        apis::database::get_post,
+                                                        apis::database::edit_post,
+                                                        apis::database::delete_post])
                     .register(apis::routes::ROOT, catchers![apis::catchers::unprocessable_content,
                                                             apis::catchers::bad_request,
                                                             apis::catchers::unauthorized,
