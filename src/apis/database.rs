@@ -1,24 +1,19 @@
-use sqlx::{postgres::PgPoolOptions};
 use crate::apis::model;
 use rocket::http::{Status, ContentType};
 use serde_json::json;
 use rocket::serde::json::Json;
+use crate::apis::auth;
+use crate::apis::postgres;
 
 #[post("/search/nickname", format="json", data="<body>")]
 pub async fn get_users(body: Json<model::user::UserNameSearchRequest>) -> (Status, (ContentType, String)) {
-    dotenv::dotenv().expect("Unable to load environment variables from .env file");
-    let db_url = std::env::var("DATABASE_URL").expect("Unable to read DATABASE_URL env var");
-    let pool = PgPoolOptions::new()
-    .max_connections(100)
-    .connect(&db_url)
-    .await.expect("Unable to connect to Postgres");
 
     let nickname = format!("{}{}{}", '%', &body.user_name, '%');
     let users = sqlx::query_as!(
         model::user::User,
-        r#"SELECT nickname AS "nickname!", email AS "email!" FROM users WHERE nickname LIKE $1"#,
+        r#"SELECT id AS "id!", nickname AS "nickname!", email AS "email!" FROM users WHERE nickname LIKE $1"#,
         nickname
-        ).fetch_all(&pool).await.unwrap_or_else(|e| {
+        ).fetch_all(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
             error!("Couldn't fetch data! {}", e);
             Vec::new()
         });
@@ -31,6 +26,345 @@ pub async fn get_users(body: Json<model::user::UserNameSearchRequest>) -> (Statu
             results: users
         }).to_string())
     }
+}
+
+#[post("/amIFollowing", format="json", data="<body>")]
+pub async fn am_i_following(bearer: auth::bearer::Bearer<'_>, body: Json<model::user::FollowRequest>) -> (Status, (ContentType, String)) {
+    if !auth::bearer::match_sub(bearer, body.follower_id).await {
+        return (Status::Unauthorized, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("You do not have permission to act on behalf of other users")
+        }).to_string()))
+    }
+
+    let count = sqlx::query_as!(
+        model::user::DbCount,
+        r#"SELECT COUNT(*) AS "cnt!" FROM follow WHERE follower_id = $1 AND followee_id = $2"#,
+        body.follower_id, body.followee_id
+        ).fetch_one(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
+            error!("Couldn't fetch data! {}", e);
+            model::user::DbCount{cnt: 0}
+        });
+
+    if count.cnt > 0 {
+        success_response(json!(model::user::AmIFollowingResponse{
+            ok: true,
+            following: true
+        }).to_string())
+    } else {
+        success_response(json!(model::user::AmIFollowingResponse{
+            ok: true,
+            following: false
+        }).to_string())
+    }
+}
+
+#[post("/follow", format="json", data="<body>")]
+pub async fn follow(bearer: auth::bearer::Bearer<'_>, body: Json<model::user::FollowRequest>) -> (Status, (ContentType, String)) {
+    if !auth::bearer::match_sub(bearer, body.follower_id).await {
+        return (Status::Unauthorized, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("You do not have permission to act on behalf of other users")
+        }).to_string()))
+    }
+
+    let ret = sqlx::query_as!(
+        model::user::DbInt,
+        r#"INSERT into follow VALUES ($1, $2) RETURNING follower_id AS "cnt!""#,
+        body.follower_id, body.followee_id
+        ).fetch_one(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
+            error!("Couldn't insert data! {}", e);
+            model::user::DbInt{cnt: 0}
+        });
+
+    if ret.cnt != body.follower_id {
+        (Status::InternalServerError, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("Database insertion failed")
+        }).to_string()))
+    } else {
+        (Status::Accepted, (ContentType::JSON, json!(model::error::Error{
+            ok: true,
+            reason: String::from("Ok")
+        }).to_string()))   
+    }
+}
+
+#[post("/unfollow", format="json", data="<body>")]
+pub async fn unfollow(bearer: auth::bearer::Bearer<'_>, body: Json<model::user::FollowRequest>) -> (Status, (ContentType, String)) {
+    if !auth::bearer::match_sub(bearer, body.follower_id).await {
+        return (Status::Unauthorized, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("You do not have permission to act on behalf of other users")
+        }).to_string()))
+    }
+
+    let ret = sqlx::query_as!(
+        model::user::DbInt,
+        r#"DELETE from follow WHERE follower_id = $1 AND followee_id = $2 RETURNING follower_id AS "cnt!""#,
+        body.follower_id, body.followee_id
+        ).fetch_one(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
+            error!("Couldn't delete data! {}", e);
+            model::user::DbInt{cnt: -1}
+        });
+
+    if ret.cnt != body.follower_id {
+        (Status::InternalServerError, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("Database removal failed")
+        }).to_string()))
+    } else {
+        (Status::Accepted, (ContentType::JSON, json!(model::error::Error{
+            ok: true,
+            reason: String::from("Ok")
+        }).to_string()))   
+    }
+}
+
+#[get("/posts")]
+pub async fn posts(_bearer: auth::bearer::Bearer<'_>) -> (Status, (ContentType, String)) {
+    let res = sqlx::query_as!(
+        model::post::Post,
+        r#"SELECT post.id AS "id!", post.author_id AS "author_id!", users.nickname AS "author_nickname!", post.title AS "title!", post.content AS "content!", post.movie_id AS "movie_id", post.movie_name AS "movie_name" 
+            FROM post 
+            JOIN users ON post.author_id = users.id"#
+        ).fetch_all(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
+            error!("Couldn't read data! {}", e);
+            Vec::new()
+        });
+    
+    (Status::Accepted, (ContentType::JSON, json!(model::post::FeedResponse{
+        ok: true,
+        posts: res
+    }).to_string()))
+}
+
+async fn get_review_count(author_id: i32, movie_id: i32) -> i32 {
+    let ret = sqlx::query_as!(
+        model::user::DbCount,
+        r#"SELECT COUNT(*) AS "cnt!" from post WHERE author_id = $1 AND movie_id = $2"#,
+        author_id, movie_id
+        ).fetch_one(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
+            error!("Couldn't insert data! {}", e);
+            model::user::DbCount{cnt: -1}
+        });
+    
+    if ret.cnt == -1 {
+        // db error
+        return -1
+    } else if ret.cnt == 1 {
+        let id = sqlx::query_as!(
+            model::user::DbInt,
+            r#"SELECT id AS "cnt!" from post WHERE author_id = $1 AND movie_id = $2"#,
+            author_id, movie_id
+            ).fetch_one(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
+                // db error
+                error!("Couldn't insert data! {}", e);
+                model::user::DbInt{cnt: -1}
+        });
+        return id.cnt
+    } else {
+        // no review
+        return 0;
+    }
+}
+
+#[post("/didIReview", format="json", data="<body>")]
+pub async fn did_i_review(bearer: auth::bearer::Bearer<'_>, body: Json<model::post::DidIReviewRequest>) -> (Status, (ContentType, String)) {
+    if !auth::bearer::match_sub(bearer, body.author_id).await {
+        return (Status::Unauthorized, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("You do not have permission to act on behalf of other users")
+        }).to_string()))
+    }
+
+    let cnt = get_review_count(body.author_id, body.movie_id).await;
+
+    if cnt < 0 {
+        (Status::InternalServerError, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("Database read failed")
+        }).to_string()))
+    } else if cnt == 0 {
+        (Status::Accepted, (ContentType::JSON, json!(model::post::DidIReviewResponse{
+            ok: true,
+            reviewed: false,
+            post_id: -1
+        }).to_string()))
+    } else {
+        (Status::Accepted, (ContentType::JSON, json!(model::post::DidIReviewResponse{
+            ok: true,
+            reviewed: true,
+            post_id: cnt
+        }).to_string()))
+    }
+}
+
+async fn make_post(author_id: i32, title: String, content: String, movie_id: Option<i32>, movie_name: Option<String>) -> model::user::DbInt {
+    sqlx::query_as!(
+        model::user::DbInt,
+        r#"INSERT into post (author_id, title, content, movie_id, movie_name) VALUES ($1, $2, $3, $4, $5) RETURNING author_id AS "cnt!""#,
+        author_id, title, content, movie_id, movie_name
+        ).fetch_one(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
+            error!("Couldn't insert data! {}", e);
+            model::user::DbInt{cnt: 0}
+        })
+}
+
+#[post("/post", format="json", data="<body>")]
+pub async fn post(bearer: auth::bearer::Bearer<'_>, body: Json<model::post::FeedPostRequest>) -> (Status, (ContentType, String)) {
+    if !auth::bearer::match_sub(bearer, body.author_id).await {
+        return (Status::Unauthorized, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("You do not have permission to act on behalf of other users")
+        }).to_string()))
+    }
+
+    let ret;
+    
+    match body.movie_id {
+        Some(m_id) => {
+            let cnt = get_review_count(body.author_id, m_id).await;
+            if cnt > 0 {
+                // already reviewed
+                return (Status::InternalServerError, (ContentType::JSON, json!(model::error::Error{
+                    ok: false,
+                    reason: String::from("You have already reviewed this movie")
+                }).to_string()));
+            } else if cnt < 0 {
+                // error while getting review count
+                return (Status::InternalServerError, (ContentType::JSON, json!(model::error::Error{
+                    ok: false,
+                    reason: String::from("Database insertion failed")
+                }).to_string()));
+            } else {
+                ret = make_post(body.author_id, body.title.clone(), body.content.clone(), body.movie_id, body.movie_name.clone()).await;
+            }
+        }
+        None => {
+            ret = make_post(body.author_id, body.title.clone(), body.content.clone(), body.movie_id, body.movie_name.clone()).await;
+        }
+    }
+
+    if ret.cnt != body.author_id {
+        (Status::InternalServerError, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("Database insertion failed")
+        }).to_string()))
+    } else {
+        (Status::Accepted, (ContentType::JSON, json!(model::error::Error{
+            ok: true,
+            reason: String::from("Ok")
+        }).to_string()))   
+    }
+}
+
+async fn get_post_from_id(post_id: i32) -> model::post::Post {
+    sqlx::query_as!(
+        model::post::Post,
+        r#"SELECT post.id AS "id!", post.author_id AS "author_id!", users.nickname AS "author_nickname!", post.title AS "title!", post.content AS "content!", post.movie_id AS "movie_id", post.movie_name AS "movie_name" 
+            FROM post 
+            JOIN users ON post.author_id = users.id
+            WHERE post.id = $1"#,
+        post_id
+        ).fetch_one(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
+            error!("Couldn't read data! {}", e);
+            model::post::Post{id: -1, author_id: -1, author_nickname: String::from(""), title: String::from(""), content: String::from(""), movie_id: Some(-1), movie_name: Some(String::from(""))}
+        })
+}
+
+#[post("/getPost", format="json", data="<body>")]
+pub async fn get_post(_bearer: auth::bearer::Bearer<'_>, body: Json<model::post::PostIdRequest>) -> (Status, (ContentType, String)) {
+    let ret = get_post_from_id(body.post_id).await;
+    if ret.id == -1 {
+        return (Status::InternalServerError, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("No such post")
+        }).to_string()));
+    }
+    
+    (Status::Accepted, (ContentType::JSON, json!(model::post::PostResponse{
+        ok: true,
+        post: ret
+    }).to_string()))
+}
+
+#[post("/editPost", format="json", data="<body>")]
+pub async fn edit_post(bearer: auth::bearer::Bearer<'_>, body: Json<model::post::EditFeedPostRequest>) -> (Status, (ContentType, String)) {
+    let ret = get_post_from_id(body.post_id).await;
+    if ret.id == -1 {
+        return (Status::InternalServerError, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("No such post")
+        }).to_string()));
+    }
+
+    if !auth::bearer::match_sub(bearer, ret.author_id).await {
+        return (Status::Unauthorized, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("You do not have permission to act on behalf of other users")
+        }).to_string()));
+    }
+
+    let res = sqlx::query_as!(
+        model::user::DbInt,
+        r#"UPDATE post SET title = $1, content = $2 WHERE id = $3 RETURNING id AS "cnt!""#,
+        body.title, body.content, body.post_id
+        ).fetch_one(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
+            error!("Couldn't edit data! {}", e);
+            model::user::DbInt{cnt: 0}
+        });
+    
+    if res.cnt <= 0 {
+        return (Status::InternalServerError, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("Could not edit post")
+        }).to_string()));
+    }
+
+    (Status::Accepted, (ContentType::JSON, json!(model::error::Error{
+        ok: true,
+        reason: String::from("OK")
+    }).to_string()))
+}
+
+#[post("/deletePost", format="json", data="<body>")]
+pub async fn delete_post(bearer: auth::bearer::Bearer<'_>, body: Json<model::post::PostIdRequest>) -> (Status, (ContentType, String)) {
+    let ret = get_post_from_id(body.post_id).await;
+    if ret.id == -1 {
+        return (Status::InternalServerError, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("No such post")
+        }).to_string()));
+    }
+
+    if !auth::bearer::match_sub(bearer, ret.author_id).await {
+        return (Status::Unauthorized, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("You do not have permission to act on behalf of other users")
+        }).to_string()))
+    }
+
+    let res = sqlx::query_as!(
+        model::user::DbInt,
+        r#"DELETE from post WHERE id = $1 RETURNING id AS "cnt!""#,
+        body.post_id
+        ).fetch_one(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
+            error!("Couldn't delete data! {}", e);
+            model::user::DbInt{cnt: 0}
+        });
+
+    if res.cnt <= 0 {
+        return (Status::InternalServerError, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("Could not delete post")
+        }).to_string()));
+    }
+
+    (Status::Accepted, (ContentType::JSON, json!(model::error::Error{
+        ok: true,
+        reason: String::from("OK")
+    }).to_string()))
 }
 
 fn parse_error() -> (Status, (ContentType, String)) {
