@@ -367,6 +367,173 @@ pub async fn delete_post(bearer: auth::bearer::Bearer<'_>, body: Json<model::pos
     }).to_string()))
 }
 
+///////////////////////////////////////
+
+#[post("/comments", format="json", data="<body>")]
+pub async fn comments(_bearer: auth::bearer::Bearer<'_>, body: Json<model::comment::CommentsFromPostRequest>) -> (Status, (ContentType, String)) {
+    let res = sqlx::query_as!(
+        model::comment::Comment,
+        r#"SELECT comment.id AS "id!", comment.author_id AS "author_id!", users.nickname AS "author_nickname!", comment.content AS "content!", comment.post_id AS "post_id!"
+            FROM comment 
+            JOIN users ON comment.author_id = users.id
+            WHERE comment.post_id = $1"#,
+            body.post_id
+        ).fetch_all(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
+            error!("Couldn't read data! {}", e);
+            Vec::new()
+        });
+    
+    (Status::Accepted, (ContentType::JSON, json!(model::comment::PostCommentsResponse{
+        ok: true,
+        comments: res
+    }).to_string()))
+}
+
+async fn make_comment(author_id: i32, content: String, post_id: i32) -> model::user::DbInt {
+    sqlx::query_as!(
+        model::user::DbInt,
+        r#"INSERT into comment (author_id, content, post_id) VALUES ($1, $2, $3) RETURNING author_id AS "cnt!""#,
+        author_id, content, post_id
+        ).fetch_one(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
+            error!("Couldn't insert data! {}", e);
+            model::user::DbInt{cnt: 0}
+        })
+}
+
+#[post("/comment", format="json", data="<body>")]
+pub async fn comment(bearer: auth::bearer::Bearer<'_>, body: Json<model::comment::CommentRequest>) -> (Status, (ContentType, String)) {
+    if !auth::bearer::match_sub(bearer, body.author_id).await {
+        return (Status::Unauthorized, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("You do not have permission to act on behalf of other users")
+        }).to_string()))
+    }
+
+    let ret;
+    
+    ret = make_comment(body.author_id, body.content.clone(), body.post_id).await;
+
+    if ret.cnt != body.author_id {
+        (Status::InternalServerError, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("Database insertion failed")
+        }).to_string()))
+    } else {
+        (Status::Accepted, (ContentType::JSON, json!(model::error::Error{
+            ok: true,
+            reason: String::from("Ok")
+        }).to_string()))   
+    }
+}
+
+async fn get_comment_from_id(comment_id: i32) -> model::comment::Comment {
+    sqlx::query_as!(
+        model::comment::Comment,
+        r#"SELECT comment.id AS "id!", comment.author_id AS "author_id!", users.nickname AS "author_nickname!", comment.content AS "content!", comment.post_id AS "post_id!"
+            FROM comment 
+            JOIN users ON comment.author_id = users.id
+            WHERE comment.id = $1"#,
+        comment_id
+        ).fetch_one(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
+            error!("Couldn't read data! {}", e);
+            model::comment::Comment{id: -1, author_id: -1, author_nickname: String::from(""), content: String::from(""), post_id: -1}
+        })
+}
+
+#[post("/getComment", format="json", data="<body>")]
+pub async fn get_comment(_bearer: auth::bearer::Bearer<'_>, body: Json<model::comment::CommentIdRequest>) -> (Status, (ContentType, String)) {
+    let ret = get_comment_from_id(body.comment_id).await;
+    if ret.id == -1 {
+        return (Status::InternalServerError, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("No such comment")
+        }).to_string()));
+    }
+    
+    (Status::Accepted, (ContentType::JSON, json!(model::comment::CommentResponse{
+        ok: true,
+        comment: ret
+    }).to_string()))
+}
+
+#[post("/editComment", format="json", data="<body>")]
+pub async fn edit_comment(bearer: auth::bearer::Bearer<'_>, body: Json<model::comment::EditCommentRequest>) -> (Status, (ContentType, String)) {
+    let ret = get_comment_from_id(body.comment_id).await;
+    if ret.id == -1 {
+        return (Status::InternalServerError, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("No such post")
+        }).to_string()));
+    }
+
+    if !auth::bearer::match_sub(bearer, ret.author_id).await {
+        return (Status::Unauthorized, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("You do not have permission to act on behalf of other users")
+        }).to_string()));
+    }
+
+    let res = sqlx::query_as!(
+        model::user::DbInt,
+        r#"UPDATE comment SET content = $1 WHERE id = $2 RETURNING id AS "cnt!""#,
+        body.content, body.comment_id
+        ).fetch_one(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
+            error!("Couldn't edit data! {}", e);
+            model::user::DbInt{cnt: 0}
+        });
+    
+    if res.cnt <= 0 {
+        return (Status::InternalServerError, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("Could not edit post")
+        }).to_string()));
+    }
+
+    (Status::Accepted, (ContentType::JSON, json!(model::error::Error{
+        ok: true,
+        reason: String::from("OK")
+    }).to_string()))
+}
+
+#[post("/deleteComment", format="json", data="<body>")]
+pub async fn delete_comment(bearer: auth::bearer::Bearer<'_>, body: Json<model::comment::CommentIdRequest>) -> (Status, (ContentType, String)) {
+    let ret = get_comment_from_id(body.comment_id).await;
+    if ret.id == -1 {
+        return (Status::InternalServerError, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("No such post")
+        }).to_string()));
+    }
+
+    if !auth::bearer::match_sub(bearer, ret.author_id).await {
+        return (Status::Unauthorized, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("You do not have permission to act on behalf of other users")
+        }).to_string()))
+    }
+
+    let res = sqlx::query_as!(
+        model::user::DbInt,
+        r#"DELETE from comment WHERE id = $1 RETURNING id AS "cnt!""#,
+        body.comment_id
+        ).fetch_one(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
+            error!("Couldn't delete data! {}", e);
+            model::user::DbInt{cnt: 0}
+        });
+
+    if res.cnt <= 0 {
+        return (Status::InternalServerError, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("Could not delete post")
+        }).to_string()));
+    }
+
+    (Status::Accepted, (ContentType::JSON, json!(model::error::Error{
+        ok: true,
+        reason: String::from("OK")
+    }).to_string()))
+}
+
 fn parse_error() -> (Status, (ContentType, String)) {
     let error_response = json!(model::error::Error{
         ok: false,
