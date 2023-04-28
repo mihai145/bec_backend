@@ -7,7 +7,7 @@ use crate::apis::auth::models;
 
 use super::public_key::AUTH0_PKEY;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Bearer<'r>(&'r str);
 
 #[derive(Debug)]
@@ -78,6 +78,39 @@ pub async fn match_sub(bearer: Bearer<'_>, id: i32) -> bool {
     match token {
         Ok(token) => {
             if token.claims.sub.strip_prefix("auth0|").unwrap() == id.to_string() {
+                return true
+            }
+            return false
+        }
+        Err(e) => {
+            print!("{}", e);
+            return false
+        }
+    }
+}
+
+pub async fn is_admin(bearer: Bearer<'_>) -> bool {
+    let public_key = AUTH0_PKEY.get().await;
+    let (n, e);
+
+    match public_key {
+        Some(key) => {
+            n = key.n.clone();
+            e = key.e.clone();
+        }
+        None => {
+            print!("Error while getting the public key");
+            return false;
+        }
+    }
+
+    let token = decode::<models::Claims>(&bearer.0, 
+        &DecodingKey::from_rsa_components(n.as_ref(), e.as_ref()).unwrap(), 
+        &Validation::new(Algorithm::RS256));
+
+    match token {
+        Ok(token) => {
+            if token.claims.https_example_com_role == "admin" {
                 return true
             }
             return false

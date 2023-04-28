@@ -299,7 +299,7 @@ pub async fn edit_post(bearer: auth::bearer::Bearer<'_>, body: Json<model::post:
         }).to_string()));
     }
 
-    if !auth::bearer::match_sub(bearer, ret.author_id).await {
+    if !auth::bearer::match_sub(bearer, ret.author_id).await && !auth::bearer::is_admin(bearer).await {
         return (Status::Unauthorized, (ContentType::JSON, json!(model::error::Error{
             ok: false,
             reason: String::from("You do not have permission to act on behalf of other users")
@@ -338,7 +338,7 @@ pub async fn delete_post(bearer: auth::bearer::Bearer<'_>, body: Json<model::pos
         }).to_string()));
     }
 
-    if !auth::bearer::match_sub(bearer, ret.author_id).await {
+    if !auth::bearer::match_sub(bearer, ret.author_id).await && !auth::bearer::is_admin(bearer).await {
         return (Status::Unauthorized, (ContentType::JSON, json!(model::error::Error{
             ok: false,
             reason: String::from("You do not have permission to act on behalf of other users")
@@ -466,7 +466,7 @@ pub async fn edit_comment(bearer: auth::bearer::Bearer<'_>, body: Json<model::co
         }).to_string()));
     }
 
-    if !auth::bearer::match_sub(bearer, ret.author_id).await {
+    if !auth::bearer::match_sub(bearer, ret.author_id).await && !auth::bearer::is_admin(bearer).await {
         return (Status::Unauthorized, (ContentType::JSON, json!(model::error::Error{
             ok: false,
             reason: String::from("You do not have permission to act on behalf of other users")
@@ -505,7 +505,7 @@ pub async fn delete_comment(bearer: auth::bearer::Bearer<'_>, body: Json<model::
         }).to_string()));
     }
 
-    if !auth::bearer::match_sub(bearer, ret.author_id).await {
+    if !auth::bearer::match_sub(bearer, ret.author_id).await && !auth::bearer::is_admin(bearer).await {
         return (Status::Unauthorized, (ContentType::JSON, json!(model::error::Error{
             ok: false,
             reason: String::from("You do not have permission to act on behalf of other users")
@@ -525,6 +525,37 @@ pub async fn delete_comment(bearer: auth::bearer::Bearer<'_>, body: Json<model::
         return (Status::InternalServerError, (ContentType::JSON, json!(model::error::Error{
             ok: false,
             reason: String::from("Could not delete post")
+        }).to_string()));
+    }
+
+    (Status::Accepted, (ContentType::JSON, json!(model::error::Error{
+        ok: true,
+        reason: String::from("OK")
+    }).to_string()))
+}
+
+#[post("/deleteUser", format="json", data="<body>")]
+pub async fn delete_user(bearer: auth::bearer::Bearer<'_>, body: Json<model::user::UserIdRequest>) -> (Status, (ContentType, String)) {
+    if !auth::bearer::is_admin(bearer).await {
+        return (Status::Unauthorized, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("You are not an admin")
+        }).to_string()))
+    }
+
+    let res = sqlx::query_as!(
+        model::user::DbInt,
+        r#"DELETE from users WHERE id = $1 RETURNING id AS "cnt!""#,
+        body.user_id
+        ).fetch_one(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
+            error!("Couldn't delete data! {}", e);
+            model::user::DbInt{cnt: 0}
+        });
+
+    if res.cnt <= 0 {
+        return (Status::InternalServerError, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("Could not delete user")
         }).to_string()));
     }
 

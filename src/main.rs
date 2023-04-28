@@ -37,7 +37,8 @@ fn rocket() -> _ {
                                                         apis::database::comment,
                                                         apis::database::get_comment,
                                                         apis::database::edit_comment,
-                                                        apis::database::delete_comment,])
+                                                        apis::database::delete_comment,
+                                                        apis::database::delete_user])
                     .register(apis::routes::ROOT, catchers![apis::catchers::unprocessable_content,
                                                             apis::catchers::bad_request,
                                                             apis::catchers::unauthorized,
