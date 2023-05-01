@@ -37,7 +37,15 @@ fn rocket() -> _ {
                                                         apis::database::comment,
                                                         apis::database::get_comment,
                                                         apis::database::edit_comment,
-                                                        apis::database::delete_comment,])
+                                                        apis::database::delete_comment,
+                                                        apis::database::like_comment,
+                                                        apis::database::like_post,
+                                                        apis::database::likes_comment,
+                                                        apis::database::likes_post,
+                                                        apis::database::get_like_comment,
+                                                        apis::database::get_like_post,
+                                                        apis::database::delete_like_comment,
+                                                        apis::database::delete_like_post])
                     .register(apis::routes::ROOT, catchers![apis::catchers::unprocessable_content,
                                                             apis::catchers::bad_request,
                                                             apis::catchers::unauthorized,
