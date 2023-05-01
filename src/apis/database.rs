@@ -539,7 +539,7 @@ pub async fn delete_comment(bearer: auth::bearer::Bearer<'_>, body: Json<model::
 
 
 #[post("/likesPost", format="json", data="<body>")]
-pub async fn likes_post(_bearer: auth::bearer::Bearer<'_>, body: Json<model::like::PostLikedRequest>) -> (Status, (ContentType, String)) {
+pub async fn likes_post(_bearer: auth::bearer::Bearer<'_>, body: Json<model::like::PostLikeRequest>) -> (Status, (ContentType, String)) {
     let res = sqlx::query_as!(
         model::user::DbCount,
         r#"SELECT COUNT(*) AS "cnt!"
@@ -668,7 +668,7 @@ pub async fn delete_like_post(bearer: auth::bearer::Bearer<'_>, body: Json<model
 
 
 #[post("/likesComment", format="json", data="<body>")]
-pub async fn likes_comment(_bearer: auth::bearer::Bearer<'_>, body: Json<model::like::CommentLikedRequest>) -> (Status, (ContentType, String)) {
+pub async fn likes_comment(_bearer: auth::bearer::Bearer<'_>, body: Json<model::like::CommentLikeRequest>) -> (Status, (ContentType, String)) {
     let res = sqlx::query_as!(
         model::user::DbCount,
         r#"SELECT COUNT(*) AS "cnt!"
