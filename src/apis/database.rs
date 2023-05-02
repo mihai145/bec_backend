@@ -793,6 +793,43 @@ pub async fn delete_like_comment(bearer: auth::bearer::Bearer<'_>, body: Json<mo
     }).to_string()))
 }
 
+#[get("/leaderboard")]
+pub async fn get_leaderboard() -> (Status, (ContentType, String)) {
+    let res = sqlx::query_as!(
+        model::leaderboard::LeaderboardUser,
+        r#"WITH 
+        commentLikesSum AS 
+        (	SELECT c.author_id, COUNT(cl.user_id)
+             FROM comment_likes cl
+             JOIN comment c ON c.id = cl.comment_id 
+            GROUP BY c.author_id
+        ),
+        postLikesSum AS
+        ( 	SELECT p.author_id, COUNT(pl.user_id)
+             FROM post_likes pl
+             JOIN post p ON p.id = pl.post_id 
+            GROUP BY p.author_id
+        )
+        SELECT coalesce(cls.author_id,pls.author_id) as "id!", 
+                u.nickname as "nickname!", 
+                u.email as "email!", 
+                (CASE WHEN cls.count is NULL THEN 0 ELSE cls.count END) + (CASE WHEN pls.count is NULL THEN 0 ELSE pls.count END) AS "total_likes!"
+        FROM commentLikesSum cls
+        FULL OUTER JOIN postLikesSum pls ON cls.author_id = pls.author_id
+        INNER JOIN users u ON cls.author_id = u.id OR pls.author_id = u.id
+        ORDER BY "total_likes!" DESC
+        LIMIT 5;"#,
+        ).fetch_all(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
+            error!("Couldn't delete data! {}", e);
+            Vec::new()
+        });
+        
+        (Status::Accepted, (ContentType::JSON, json!(model::leaderboard::LeaderboardResultApi{
+            ok: true,
+            users: res
+        }).to_string()))
+}
+
 
 fn parse_error() -> (Status, (ContentType, String)) {
     let error_response = json!(model::error::Error{
