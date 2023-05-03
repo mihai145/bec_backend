@@ -534,6 +534,303 @@ pub async fn delete_comment(bearer: auth::bearer::Bearer<'_>, body: Json<model::
     }).to_string()))
 }
 
+
+/////////////////////////////
+
+
+#[post("/likesPost", format="json", data="<body>")]
+pub async fn likes_post(_bearer: auth::bearer::Bearer<'_>, body: Json<model::like::PostLikeRequest>) -> (Status, (ContentType, String)) {
+    let res = sqlx::query_as!(
+        model::user::DbCount,
+        r#"SELECT COUNT(*) AS "cnt!"
+            FROM post_likes 
+            WHERE post_likes.post_id = $1"#,
+            body.post_id
+        ).fetch_one(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
+            error!("Couldn't read data! {}", e);
+            model::user::DbCount{cnt: 0}
+        });
+    
+    (Status::Accepted, (ContentType::JSON, json!(model::like::LikeResponse{
+        ok: true,
+        results: res.cnt
+    }).to_string()))
+}
+
+async fn make_post_like(author_id: i32, post_id: i32) -> model::user::DbInt {
+    sqlx::query_as!(
+        model::user::DbInt,
+        r#"INSERT into post_likes (user_id, post_id) VALUES ($1, $2) RETURNING user_id AS "cnt!""#,
+        author_id, post_id
+        ).fetch_one(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
+            error!("Couldn't insert data! {}", e);
+            model::user::DbInt{cnt: 0}
+        })
+}
+
+#[post("/likePost", format="json", data="<body>")]
+pub async fn like_post(bearer: auth::bearer::Bearer<'_>, body: Json<model::like::PostLikedRequest>) -> (Status, (ContentType, String)) {
+    if !auth::bearer::match_sub(bearer, body.author_id).await {
+        return (Status::Unauthorized, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("You do not have permission to act on behalf of other users")
+        }).to_string()))
+    }
+
+    let ret;
+    
+    ret = make_post_like(body.author_id, body.post_id).await;
+
+    if ret.cnt != body.author_id {
+        (Status::InternalServerError, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("Database insertion failed")
+        }).to_string()))
+    } else {
+        (Status::Accepted, (ContentType::JSON, json!(model::error::Error{
+            ok: true,
+            reason: String::from("Ok")
+        }).to_string()))   
+    }
+}
+
+async fn get_post_like_from_id(post_id: i32, author_id: i32) -> i64 {
+    let ret = sqlx::query_as!(
+        model::user::DbCount,
+        r#"SELECT COUNT(*) AS "cnt!"
+            FROM post_likes 
+            WHERE post_likes.post_id = $1 AND post_likes.user_id = $2"#,
+        post_id, author_id
+        ).fetch_one(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
+            error!("Couldn't read data! {}", e);
+            model::user::DbCount {cnt: -1}
+        });
+    
+    return ret.cnt
+}
+
+#[post("/getLikePost", format="json", data="<body>")]
+pub async fn get_like_post(_bearer: auth::bearer::Bearer<'_>, body: Json<model::like::PostLikedRequest>) -> (Status, (ContentType, String)) {
+    let ret = get_post_like_from_id(body.post_id, body.author_id).await;
+    if ret == -1 {
+        return (Status::InternalServerError, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("Internal Database error")
+        }).to_string()));
+    }
+    
+    (Status::Accepted, (ContentType::JSON, json!(model::like::LikeResponse{
+        ok: true,
+        results: ret
+    }).to_string()))
+}
+
+#[post("/deleteLikePost", format="json", data="<body>")]
+pub async fn delete_like_post(bearer: auth::bearer::Bearer<'_>, body: Json<model::like::PostLikedRequest>) -> (Status, (ContentType, String)) {
+    let ret = get_post_like_from_id(body.post_id, body.author_id).await;
+    if ret <= 0 {
+        return (Status::InternalServerError, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("No such like")
+        }).to_string()));
+    }
+
+    if !auth::bearer::match_sub(bearer, body.author_id).await {
+        return (Status::Unauthorized, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("You do not have permission to act on behalf of other users")
+        }).to_string()))
+    }
+
+    let res = sqlx::query_as!(
+        model::user::DbInt,
+        r#"DELETE from post_likes WHERE post_id = $1 AND user_id = $2 RETURNING user_id AS "cnt!""#,
+        body.post_id, body.author_id
+        ).fetch_one(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
+            error!("Couldn't delete data! {}", e);
+            model::user::DbInt{cnt: 0}
+        });
+
+    if res.cnt <= 0 {
+        return (Status::InternalServerError, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("Could not delete like")
+        }).to_string()));
+    }
+
+    (Status::Accepted, (ContentType::JSON, json!(model::error::Error{
+        ok: true,
+        reason: String::from("OK")
+    }).to_string()))
+}
+
+///////////////////////////////
+
+
+#[post("/likesComment", format="json", data="<body>")]
+pub async fn likes_comment(_bearer: auth::bearer::Bearer<'_>, body: Json<model::like::CommentLikeRequest>) -> (Status, (ContentType, String)) {
+    let res = sqlx::query_as!(
+        model::user::DbCount,
+        r#"SELECT COUNT(*) AS "cnt!"
+            FROM comment_likes 
+            WHERE comment_likes.comment_id = $1"#,
+            body.comment_id
+        ).fetch_one(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
+            error!("Couldn't read data! {}", e);
+            model::user::DbCount{cnt: 0}
+        });
+    
+    (Status::Accepted, (ContentType::JSON, json!(model::like::LikeResponse{
+        ok: true,
+        results: res.cnt
+    }).to_string()))
+}
+
+async fn make_comment_like(author_id: i32, comment_id: i32) -> model::user::DbInt {
+    sqlx::query_as!(
+        model::user::DbInt,
+        r#"INSERT into comment_likes (user_id, comment_id) VALUES ($1, $2) RETURNING user_id AS "cnt!""#,
+        author_id, comment_id
+        ).fetch_one(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
+            error!("Couldn't insert data! {}", e);
+            model::user::DbInt{cnt: 0}
+        })
+}
+
+#[post("/likeComment", format="json", data="<body>")]
+pub async fn like_comment(bearer: auth::bearer::Bearer<'_>, body: Json<model::like::CommentLikedRequest>) -> (Status, (ContentType, String)) {
+    if !auth::bearer::match_sub(bearer, body.author_id).await {
+        return (Status::Unauthorized, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("You do not have permission to act on behalf of other users")
+        }).to_string()))
+    }
+
+    let ret;
+    
+    ret = make_comment_like(body.author_id, body.comment_id).await;
+
+    if ret.cnt != body.author_id {
+        (Status::InternalServerError, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("Database insertion failed")
+        }).to_string()))
+    } else {
+        (Status::Accepted, (ContentType::JSON, json!(model::error::Error{
+            ok: true,
+            reason: String::from("Ok")
+        }).to_string()))   
+    }
+}
+
+async fn get_comment_like_from_id(comment_id: i32, author_id: i32) -> i64 {
+    let ret = sqlx::query_as!(
+        model::user::DbCount,
+        r#"SELECT COUNT(*) AS "cnt!"
+            FROM comment_likes 
+            WHERE comment_id = $1 AND user_id = $2"#,
+        comment_id, author_id
+        ).fetch_one(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
+            error!("Couldn't read data! {}", e);
+            model::user::DbCount{cnt: -1}
+        });
+    
+    return ret.cnt
+}
+
+#[post("/getLikeComment", format="json", data="<body>")]
+pub async fn get_like_comment(_bearer: auth::bearer::Bearer<'_>, body: Json<model::like::CommentLikedRequest>) -> (Status, (ContentType, String)) {
+    let ret = get_comment_like_from_id(body.comment_id, body.author_id).await;
+    if ret == -1 {
+        return (Status::InternalServerError, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("Internal Database error")
+        }).to_string()));
+    }
+    
+    (Status::Accepted, (ContentType::JSON, json!(model::like::LikeResponse{
+        ok: true,
+        results: ret
+    }).to_string()))
+}
+
+#[post("/deleteLikeComment", format="json", data="<body>")]
+pub async fn delete_like_comment(bearer: auth::bearer::Bearer<'_>, body: Json<model::like::CommentLikedRequest>) -> (Status, (ContentType, String)) {
+    let ret = get_comment_like_from_id(body.comment_id, body.author_id).await;
+    if ret <= 0 {
+        return (Status::InternalServerError, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("No such like")
+        }).to_string()));
+    }
+
+    if !auth::bearer::match_sub(bearer, body.author_id).await {
+        return (Status::Unauthorized, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("You do not have permission to act on behalf of other users")
+        }).to_string()))
+    }
+
+    let res = sqlx::query_as!(
+        model::user::DbInt,
+        r#"DELETE from comment_likes WHERE comment_id = $1 AND user_id = $2 RETURNING user_id AS "cnt!""#,
+        body.comment_id, body.author_id
+        ).fetch_one(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
+            error!("Couldn't delete data! {}", e);
+            model::user::DbInt{cnt: 0}
+        });
+
+    if res.cnt <= 0 {
+        return (Status::InternalServerError, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("Could not delete like")
+        }).to_string()));
+    }
+
+    (Status::Accepted, (ContentType::JSON, json!(model::error::Error{
+        ok: true,
+        reason: String::from("OK")
+    }).to_string()))
+}
+
+#[get("/leaderboard")]
+pub async fn get_leaderboard() -> (Status, (ContentType, String)) {
+    let res = sqlx::query_as!(
+        model::leaderboard::LeaderboardUser,
+        r#"WITH 
+        commentLikesSum AS 
+        (	SELECT c.author_id, COUNT(cl.user_id)
+             FROM comment_likes cl
+             JOIN comment c ON c.id = cl.comment_id 
+            GROUP BY c.author_id
+        ),
+        postLikesSum AS
+        ( 	SELECT p.author_id, COUNT(pl.user_id)
+             FROM post_likes pl
+             JOIN post p ON p.id = pl.post_id 
+            GROUP BY p.author_id
+        )
+        SELECT coalesce(cls.author_id,pls.author_id) as "id!", 
+                u.nickname as "nickname!", 
+                u.email as "email!", 
+                (CASE WHEN cls.count is NULL THEN 0 ELSE cls.count END) + (CASE WHEN pls.count is NULL THEN 0 ELSE pls.count END) AS "total_likes!"
+        FROM commentLikesSum cls
+        FULL OUTER JOIN postLikesSum pls ON cls.author_id = pls.author_id
+        INNER JOIN users u ON cls.author_id = u.id OR pls.author_id = u.id
+        ORDER BY "total_likes!" DESC
+        LIMIT 5;"#,
+        ).fetch_all(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
+            error!("Couldn't delete data! {}", e);
+            Vec::new()
+        });
+        
+        (Status::Accepted, (ContentType::JSON, json!(model::leaderboard::LeaderboardResultApi{
+            ok: true,
+            users: res
+        }).to_string()))
+}
+
+
 fn parse_error() -> (Status, (ContentType, String)) {
     let error_response = json!(model::error::Error{
         ok: false,
