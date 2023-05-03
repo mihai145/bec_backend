@@ -7,7 +7,7 @@
 <li>Oprea Mihai Adrian (gr 252) </li>
 
 ### Epic stories
- ...
+ https://docs.google.com/document/d/1ABb4r_hdL_LdkEk6mRNq0DWHuSjYFZ-vMU_UJOMtrPE/edit?usp=sharing
 
 ### User stories
  https://docs.google.com/document/d/1FQGcLv-_Ce2IIifc6E2UAafGtPCO9GO_mnbch_Fdfmc/edit?usp=sharing
