@@ -38,6 +38,7 @@ fn rocket() -> _ {
                                                         apis::database::get_comment,
                                                         apis::database::edit_comment,
                                                         apis::database::delete_comment,
+                                                        apis::database::delete_user,
                                                         apis::database::like_comment,
                                                         apis::database::like_post,
                                                         apis::database::likes_comment,

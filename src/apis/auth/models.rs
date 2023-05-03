@@ -20,9 +20,13 @@ pub struct Key {
     pub x5c: Vec<String>,
 }
 
+
+
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Claims {
+    #[serde(rename = "https://example.com/role")]
+    pub https_example_com_role: String,
     pub nickname: String,
     pub name: String,
     pub picture: String,

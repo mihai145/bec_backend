@@ -56,3 +56,10 @@ pub struct FollowRequest {
     pub follower_id: i32,
     pub followee_id: i32
 }
+
+// Received from client
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserIdRequest {
+    pub user_id: i32
+}
