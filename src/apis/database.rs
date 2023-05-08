@@ -849,15 +849,20 @@ pub async fn get_leaderboard() -> (Status, (ContentType, String)) {
              JOIN post p ON p.id = pl.post_id 
             GROUP BY p.author_id
         )
-        SELECT coalesce(cls.author_id,pls.author_id) as "id!", 
+        SELECT *,
+				ROW_NUMBER() OVER(ORDER BY "total_likes!" DESC) AS "place!"
+		FROM(
+			SELECT
+				coalesce(cls.author_id,pls.author_id) as "id!", 
                 u.nickname as "nickname!", 
-                u.email as "email!", 
+                u.email as "email!",
                 (CASE WHEN cls.count is NULL THEN 0 ELSE cls.count END) + (CASE WHEN pls.count is NULL THEN 0 ELSE pls.count END) AS "total_likes!"
-        FROM commentLikesSum cls
-        FULL OUTER JOIN postLikesSum pls ON cls.author_id = pls.author_id
-        INNER JOIN users u ON cls.author_id = u.id OR pls.author_id = u.id
-        ORDER BY "total_likes!" DESC
-        LIMIT 5;"#,
+			FROM commentLikesSum cls
+			FULL OUTER JOIN postLikesSum pls ON cls.author_id = pls.author_id
+			INNER JOIN users u ON cls.author_id = u.id OR pls.author_id = u.id
+			ORDER BY "total_likes!" DESC
+			LIMIT 5
+			) tabel;"#,
         ).fetch_all(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
             error!("Couldn't delete data! {}", e);
             Vec::new()

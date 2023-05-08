@@ -13,5 +13,6 @@ pub struct LeaderboardUser {
     pub id: i32,
     pub nickname: String,
     pub email: String,
+    pub place: i64,
     pub total_likes: i64
 }
