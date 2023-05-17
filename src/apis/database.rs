@@ -909,7 +909,7 @@ async fn make_notification(user_id: i32, message: String) -> model::user::DbInt
         })
 }
 #[post("/deleteNotification", format="json", data="<body>")]
-pub async fn delete_notification(body: Json<model::user::NotificationDelete>) -> (Status, (ContentType, String)) {
+pub async fn delete_notification(_bearer: auth::bearer::Bearer<'_>,body: Json<model::user::NotificationDelete>) -> (Status, (ContentType, String)) {
     let res = sqlx::query_as!(
         model::user::DbInt,
         r#"DELETE from notification WHERE notification_id = $1 RETURNING user_id AS "cnt!""#,
@@ -933,7 +933,7 @@ pub async fn delete_notification(body: Json<model::user::NotificationDelete>) ->
 }
 
 #[post("/getNotification", format="json", data="<body>")]
-pub async fn get_notification(body: Json<model::user::NotificationRequest>) -> (Status, (ContentType, String)) {
+pub async fn get_notification(_bearer: auth::bearer::Bearer<'_>,body: Json<model::user::NotificationRequest>) -> (Status, (ContentType, String)) {
     
     let res = sqlx::query_as!(
         model::user::Notification,
