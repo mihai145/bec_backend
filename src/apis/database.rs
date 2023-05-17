@@ -390,6 +390,12 @@ pub async fn comments(_bearer: auth::bearer::Bearer<'_>, body: Json<model::comme
 }
 
 async fn make_comment(author_id: i32, content: String, post_id: i32) -> model::user::DbInt {
+    let ret = get_post_from_id(post_id).await;
+    if ret.id == -1 {
+        let message = format!("New comment on your post titled {} about {}",ret.title,ret.movie_name.unwrap_or(String::new()));
+        make_notification(ret.author_id,message).await;
+    }
+
     sqlx::query_as!(
         model::user::DbInt,
         r#"INSERT into comment (author_id, content, post_id) VALUES ($1, $2, $3) RETURNING author_id AS "cnt!""#,
@@ -597,6 +603,12 @@ pub async fn likes_post(_bearer: auth::bearer::Bearer<'_>, body: Json<model::lik
 }
 
 async fn make_post_like(author_id: i32, post_id: i32) -> model::user::DbInt {
+    let ret = get_post_from_id(post_id).await;
+    if ret.id == -1 {
+        let message = format!("New like on your post titled {} about {}",ret.title,ret.movie_name.unwrap_or(String::new()));
+        make_notification(ret.author_id,message).await;
+    }
+
     sqlx::query_as!(
         model::user::DbInt,
         r#"INSERT into post_likes (user_id, post_id) VALUES ($1, $2) RETURNING user_id AS "cnt!""#,
@@ -726,6 +738,12 @@ pub async fn likes_comment(_bearer: auth::bearer::Bearer<'_>, body: Json<model::
 }
 
 async fn make_comment_like(author_id: i32, comment_id: i32) -> model::user::DbInt {
+    let ret = get_comment_from_id(comment_id).await;
+    if ret.id == -1 {
+        let message = String::from("New like on your comment");
+        make_notification(ret.author_id,message).await;
+    }
+
     sqlx::query_as!(
         model::user::DbInt,
         r#"INSERT into comment_likes (user_id, comment_id) VALUES ($1, $2) RETURNING user_id AS "cnt!""#,
