@@ -49,6 +49,12 @@ pub struct DbInt {
     pub cnt: i32
 }
 
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DbOptionInt {
+    pub cnt: Option<i32>
+}
+
 // Received from client
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
