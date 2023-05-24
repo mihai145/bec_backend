@@ -390,6 +390,12 @@ pub async fn comments(_bearer: auth::bearer::Bearer<'_>, body: Json<model::comme
 }
 
 async fn make_comment(author_id: i32, content: String, post_id: i32) -> model::user::DbInt {
+    let ret = get_post_from_id(post_id).await;
+    if ret.id != -1 && author_id != ret.author_id{
+        let message = format!("New comment on your post titled {} about {}",ret.title,ret.movie_name.unwrap_or(String::new()));
+        make_notification(ret.author_id,message).await;
+    }
+
     sqlx::query_as!(
         model::user::DbInt,
         r#"INSERT into comment (author_id, content, post_id) VALUES ($1, $2, $3) RETURNING author_id AS "cnt!""#,
@@ -597,6 +603,12 @@ pub async fn likes_post(_bearer: auth::bearer::Bearer<'_>, body: Json<model::lik
 }
 
 async fn make_post_like(author_id: i32, post_id: i32) -> model::user::DbInt {
+    let ret = get_post_from_id(post_id).await;
+    if ret.id != -1 && author_id != ret.author_id{
+        let message = format!("New like on your post titled {} about {}",ret.title,ret.movie_name.unwrap_or(String::new()));
+        make_notification(ret.author_id,message).await;
+    }
+
     sqlx::query_as!(
         model::user::DbInt,
         r#"INSERT into post_likes (user_id, post_id) VALUES ($1, $2) RETURNING user_id AS "cnt!""#,
@@ -726,6 +738,12 @@ pub async fn likes_comment(_bearer: auth::bearer::Bearer<'_>, body: Json<model::
 }
 
 async fn make_comment_like(author_id: i32, comment_id: i32) -> model::user::DbInt {
+    let ret = get_comment_from_id(comment_id).await;
+    if ret.id != -1 && author_id != ret.author_id{
+        let message = String::from("New like on your comment");
+        make_notification(ret.author_id,message).await;
+    }
+
     sqlx::query_as!(
         model::user::DbInt,
         r#"INSERT into comment_likes (user_id, comment_id) VALUES ($1, $2) RETURNING user_id AS "cnt!""#,
@@ -877,4 +895,59 @@ pub async fn get_leaderboard() -> (Status, (ContentType, String)) {
 // Augment the response with status code and content type
 fn success_response(serialized_json: String) -> (Status, (ContentType, String)) {
     (Status::Accepted, (ContentType::JSON, serialized_json))
+}
+
+async fn make_notification(user_id: i32, message: String) -> model::user::DbInt
+{
+    sqlx::query_as!(
+        model::user::DbInt,
+        r#"INSERT into notification (user_id, message) VALUES ($1, $2) RETURNING notification_id AS "cnt!""#,
+        user_id, message
+        ).fetch_one(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
+            error!("Couldn't insert data! {}", e);
+            model::user::DbInt{cnt: 0}
+        })
+}
+#[post("/deleteNotification", format="json", data="<body>")]
+pub async fn delete_notification(_bearer: auth::bearer::Bearer<'_>,body: Json<model::user::NotificationDelete>) -> (Status, (ContentType, String)) {
+    let res = sqlx::query_as!(
+        model::user::DbInt,
+        r#"DELETE from notification WHERE notification_id = $1 RETURNING user_id AS "cnt!""#,
+        body.notification_id
+        ).fetch_one(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
+            error!("Couldn't delete data! {}", e);
+            model::user::DbInt{cnt: -1}
+        });
+    
+    if res.cnt <= 0 {
+        return (Status::InternalServerError, (ContentType::JSON, json!(model::error::Error{
+            ok: false,
+            reason: String::from("Could not delete like")
+        }).to_string()));
+    }
+
+    (Status::Accepted, (ContentType::JSON, json!(model::error::Error{
+        ok: true,
+        reason: String::from("OK")
+    }).to_string()))
+}
+
+#[post("/getNotification", format="json", data="<body>")]
+pub async fn get_notification(_bearer: auth::bearer::Bearer<'_>,body: Json<model::user::NotificationRequest>) -> (Status, (ContentType, String)) {
+    
+    let res = sqlx::query_as!(
+        model::user::Notification,
+        r#"SELECT notification_id AS "notification_id!",message AS "message!"
+            FROM notification
+            WHERE user_id = $1"#,
+            body.user_id
+        ).fetch_all(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
+            error!("Couldn't read data! {}", e);
+            Vec::new()
+        });
+    
+    (Status::Accepted, (ContentType::JSON, json!(model::user::NotificationResponse{
+        ok: true,
+        results: res
+    }).to_string()))
 }
