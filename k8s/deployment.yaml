@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: bec-backend
-        image: registry.digitalocean.com/bec-registry/bec_backend:0.0.1
+        image: registry.digitalocean.com/bec-registry-2/bec_backend:0.0.1
         imagePullPolicy: Always
         ports:
         - containerPort: 8000
@@ -26,9 +26,9 @@ kind: Service
 metadata:
   name: nginx
   annotations:
-    kubernetes.digitalocean.com/load-balancer-id: "bec-backend-load-balancer"
+    kubernetes.digitalocean.com/load-balancer-id: "teambec-life-lb"
     service.beta.kubernetes.io/do-loadbalancer-size-unit: "1"
-    service.beta.kubernetes.io/do-loadbalancer-certificate-id: "327c3e5a-aa3a-4d4e-8d26-e85f1cc7b605"
+    service.beta.kubernetes.io/do-loadbalancer-certificate-id: "969dc671-d381-487d-bef2-6272a7be43df"
     service.beta.kubernetes.io/do-loadbalancer-disable-lets-encrypt-dns-records: "false"
 spec:
   type: LoadBalancer
