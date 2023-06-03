@@ -7,3 +7,4 @@ pub mod post;
 pub mod comment;
 pub mod like;
 pub mod leaderboard;
+pub mod openai;

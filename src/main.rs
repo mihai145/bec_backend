@@ -50,6 +50,7 @@ fn rocket() -> _ {
                                                         apis::database::get_leaderboard,
                                                         apis::database::get_notification,
                                                         apis::database::delete_notification])
+                    .mount(apis::routes::ROOT,routes![apis::openai::ask_gpt])
                     .register(apis::routes::ROOT, catchers![apis::catchers::unprocessable_content,
                                                             apis::catchers::bad_request,
                                                             apis::catchers::unauthorized,

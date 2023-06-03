@@ -6,3 +6,4 @@ pub mod auth;
 pub mod bec;
 pub mod database;
 pub mod postgres;
+pub mod openai;
