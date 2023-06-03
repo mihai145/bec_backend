@@ -3,8 +3,6 @@ use rocket::http::{Status, ContentType};
 use rocket::serde::json::Json;
 use serde_json::json;
 use async_once::AsyncOnce;
-use dotenv::dotenv;
-use std::env;
 
 lazy_static! {
     #[derive(Debug)]
