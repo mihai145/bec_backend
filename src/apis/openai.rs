@@ -23,7 +23,7 @@ pub async fn ask_gpt(body: Json<model::openai::RecommandationRequest>) -> (Statu
         messages: vec![
             model::openai::Message {
                 role: "user".to_string(),
-                content: format!("I like {} movies please recommend a list of movies i should watch, just the titles, csv format", body.preferences.join(" and ")),
+                content: format!("I like [{}] movies please recommend a list of movies i should watch, just the titles, csv format \n whatever the list is, dont apologize, output the list in csv format and nothing else", body.preferences.join(" , ")),
             },
         ],
     };
