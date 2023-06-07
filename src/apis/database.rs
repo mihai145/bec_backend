@@ -934,7 +934,7 @@ pub async fn delete_notification(_bearer: auth::bearer::Bearer<'_>,body: Json<mo
 }
 
 #[post("/getNotification", format="json", data="<body>")]
-pub async fn get_notification(body: Json<model::user::NotificationRequest>) -> (Status, (ContentType, String)) {
+pub async fn get_notification(_bearer: auth::bearer::Bearer<'_>,body: Json<model::user::NotificationRequest>) -> (Status, (ContentType, String)) {
     
     let res = sqlx::query_as!(
         model::user::Notification,
