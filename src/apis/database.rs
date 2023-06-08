@@ -393,7 +393,7 @@ async fn make_comment(author_id: i32, content: String, post_id: i32) -> model::u
     let ret = get_post_from_id(post_id).await;
     if ret.id != -1 && author_id != ret.author_id{
         let message = format!("New comment on your post titled {} about {}",ret.title,ret.movie_name.unwrap_or(String::new()));
-        make_notification(ret.author_id,message).await;
+        make_notification(ret.author_id,message,post_id).await;
     }
 
     sqlx::query_as!(
@@ -606,7 +606,7 @@ async fn make_post_like(author_id: i32, post_id: i32) -> model::user::DbInt {
     let ret = get_post_from_id(post_id).await;
     if ret.id != -1 && author_id != ret.author_id{
         let message = format!("New like on your post titled {} about {}",ret.title,ret.movie_name.unwrap_or(String::new()));
-        make_notification(ret.author_id,message).await;
+        make_notification(ret.author_id,message,post_id).await;
     }
 
     sqlx::query_as!(
@@ -741,7 +741,7 @@ async fn make_comment_like(author_id: i32, comment_id: i32) -> model::user::DbIn
     let ret = get_comment_from_id(comment_id).await;
     if ret.id != -1 && author_id != ret.author_id{
         let message = String::from("New like on your comment");
-        make_notification(ret.author_id,message).await;
+        make_notification(ret.author_id,message,-1).await;
     }
 
     sqlx::query_as!(
@@ -897,17 +897,18 @@ fn success_response(serialized_json: String) -> (Status, (ContentType, String)) 
     (Status::Accepted, (ContentType::JSON, serialized_json))
 }
 
-async fn make_notification(user_id: i32, message: String) -> model::user::DbInt
+async fn make_notification(user_id: i32, message: String,post_id :i32) -> model::user::DbInt
 {
     sqlx::query_as!(
         model::user::DbInt,
-        r#"INSERT into notification (user_id, message) VALUES ($1, $2) RETURNING notification_id AS "cnt!""#,
-        user_id, message
+        r#"INSERT into notification (user_id, message, post_id) VALUES ($1, $2, $3) RETURNING notification_id AS "cnt!""#,
+        user_id, message, post_id
         ).fetch_one(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
             error!("Couldn't insert data! {}", e);
             model::user::DbInt{cnt: 0}
         })
 }
+
 #[post("/deleteNotification", format="json", data="<body>")]
 pub async fn delete_notification(_bearer: auth::bearer::Bearer<'_>,body: Json<model::user::NotificationDelete>) -> (Status, (ContentType, String)) {
     let res = sqlx::query_as!(
@@ -937,7 +938,7 @@ pub async fn get_notification(_bearer: auth::bearer::Bearer<'_>,body: Json<model
     
     let res = sqlx::query_as!(
         model::user::Notification,
-        r#"SELECT notification_id AS "notification_id!",message AS "message!"
+        r#"SELECT notification_id AS "notification_id!",message AS "message!",post_id AS "post_id!"
             FROM notification
             WHERE user_id = $1"#,
             body.user_id

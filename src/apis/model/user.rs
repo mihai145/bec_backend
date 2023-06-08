@@ -75,7 +75,8 @@ pub struct UserIdRequest {
 #[serde(rename_all = "camelCase")]
 pub struct Notification {
     pub notification_id: i32,
-    pub message: String
+    pub message: String,
+    pub post_id: i32
 }
 
 // Received from client
