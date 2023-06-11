@@ -121,13 +121,36 @@ pub async fn unfollow(bearer: auth::bearer::Bearer<'_>, body: Json<model::user::
     }
 }
 
-#[get("/posts")]
-pub async fn posts(_bearer: auth::bearer::Bearer<'_>) -> (Status, (ContentType, String)) {
+#[post("/posts", format="json", data="<body>")]
+pub async fn posts(_bearer: auth::bearer::Bearer<'_>, body: Json<model::user::UserIdRequest>) -> (Status, (ContentType, String)) {
     let res = sqlx::query_as!(
         model::post::Post,
         r#"SELECT post.id AS "id!", post.author_id AS "author_id!", users.nickname AS "author_nickname!", post.title AS "title!", post.content AS "content!", post.movie_id AS "movie_id", post.movie_name AS "movie_name" 
-            FROM post 
-            JOIN users ON post.author_id = users.id"#
+            FROM post
+            JOIN users ON post.author_id = users.id
+            JOIN follow ON follow.followee_id = users.id
+            WHERE follow.follower_id = $1"#,
+            body.user_id
+        ).fetch_all(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
+            error!("Couldn't read data! {}", e);
+            Vec::new()
+        });
+    
+    (Status::Accepted, (ContentType::JSON, json!(model::post::FeedResponse{
+        ok: true,
+        posts: res
+    }).to_string()))
+}
+
+#[post("/userPosts", format="json", data="<body>")]
+pub async fn get_user_posts(_bearer: auth::bearer::Bearer<'_>, body: Json<model::user::UserIdRequest>) -> (Status, (ContentType, String)) {
+    let res = sqlx::query_as!(
+        model::post::Post,
+        r#"SELECT post.id AS "id!", post.author_id AS "author_id!", users.nickname AS "author_nickname!", post.title AS "title!", post.content AS "content!", post.movie_id AS "movie_id", post.movie_name AS "movie_name" 
+            FROM post
+            JOIN users ON post.author_id = users.id
+            WHERE post.author_id = $1"#,
+            body.user_id
         ).fetch_all(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
             error!("Couldn't read data! {}", e);
             Vec::new()
