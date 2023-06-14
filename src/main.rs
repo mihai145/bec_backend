@@ -31,6 +31,7 @@ fn rocket() -> _ {
                                                         apis::database::did_i_review,
                                                         apis::database::post,
                                                         apis::database::get_post,
+                                                        apis::database::get_user_posts,
                                                         apis::database::edit_post,
                                                         apis::database::delete_post,
                                                         apis::database::comments,
