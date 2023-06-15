@@ -5,9 +5,9 @@ use rocket::serde::json::Json;
 use crate::apis::auth;
 use crate::apis::postgres;
 
+// search a user by username
 #[post("/search/nickname", format="json", data="<body>")]
 pub async fn get_users(body: Json<model::user::UserNameSearchRequest>) -> (Status, (ContentType, String)) {
-
     let nickname = format!("{}{}{}", '%', &body.user_name, '%');
     let users = sqlx::query_as!(
         model::user::User,
@@ -28,6 +28,7 @@ pub async fn get_users(body: Json<model::user::UserNameSearchRequest>) -> (Statu
     }
 }
 
+// checks to see if a user is following another user
 #[post("/amIFollowing", format="json", data="<body>")]
 pub async fn am_i_following(bearer: auth::bearer::Bearer<'_>, body: Json<model::user::FollowRequest>) -> (Status, (ContentType, String)) {
     if !auth::bearer::match_sub(bearer, body.follower_id).await {
@@ -59,6 +60,7 @@ pub async fn am_i_following(bearer: auth::bearer::Bearer<'_>, body: Json<model::
     }
 }
 
+// registers a "follows" relationship
 #[post("/follow", format="json", data="<body>")]
 pub async fn follow(bearer: auth::bearer::Bearer<'_>, body: Json<model::user::FollowRequest>) -> (Status, (ContentType, String)) {
     if !auth::bearer::match_sub(bearer, body.follower_id).await {
@@ -90,6 +92,7 @@ pub async fn follow(bearer: auth::bearer::Bearer<'_>, body: Json<model::user::Fo
     }
 }
 
+// unwinds a "follows" relationship
 #[post("/unfollow", format="json", data="<body>")]
 pub async fn unfollow(bearer: auth::bearer::Bearer<'_>, body: Json<model::user::FollowRequest>) -> (Status, (ContentType, String)) {
     if !auth::bearer::match_sub(bearer, body.follower_id).await {
@@ -121,6 +124,7 @@ pub async fn unfollow(bearer: auth::bearer::Bearer<'_>, body: Json<model::user::
     }
 }
 
+// builds the feed of a user
 #[post("/posts", format="json", data="<body>")]
 pub async fn posts(_bearer: auth::bearer::Bearer<'_>, body: Json<model::user::UserIdRequest>) -> (Status, (ContentType, String)) {
     let res = sqlx::query_as!(
@@ -142,6 +146,7 @@ pub async fn posts(_bearer: auth::bearer::Bearer<'_>, body: Json<model::user::Us
     }).to_string()))
 }
 
+// gets all the posts of a given user
 #[post("/userPosts", format="json", data="<body>")]
 pub async fn get_user_posts(_bearer: auth::bearer::Bearer<'_>, body: Json<model::user::UserIdRequest>) -> (Status, (ContentType, String)) {
     let res = sqlx::query_as!(
@@ -162,6 +167,7 @@ pub async fn get_user_posts(_bearer: auth::bearer::Bearer<'_>, body: Json<model:
     }).to_string()))
 }
 
+// gets the number of reviews for a given movie and user
 async fn get_review_count(author_id: i32, movie_id: i32) -> i32 {
     let ret = sqlx::query_as!(
         model::user::DbCount,
@@ -172,8 +178,7 @@ async fn get_review_count(author_id: i32, movie_id: i32) -> i32 {
             model::user::DbCount{cnt: -1}
         });
     
-    if ret.cnt == -1 {
-        // db error
+    if ret.cnt == -1 { // db error
         return -1
     } else if ret.cnt == 1 {
         let id = sqlx::query_as!(
@@ -192,6 +197,7 @@ async fn get_review_count(author_id: i32, movie_id: i32) -> i32 {
     }
 }
 
+// checks to see if a user has reviewd a given movie
 #[post("/didIReview", format="json", data="<body>")]
 pub async fn did_i_review(bearer: auth::bearer::Bearer<'_>, body: Json<model::post::DidIReviewRequest>) -> (Status, (ContentType, String)) {
     if !auth::bearer::match_sub(bearer, body.author_id).await {
@@ -223,6 +229,7 @@ pub async fn did_i_review(bearer: auth::bearer::Bearer<'_>, body: Json<model::po
     }
 }
 
+// inserts a new post in the database
 async fn make_post(author_id: i32, title: String, content: String, movie_id: Option<i32>, movie_name: Option<String>) -> model::user::DbInt {
     sqlx::query_as!(
         model::user::DbInt,
@@ -234,6 +241,7 @@ async fn make_post(author_id: i32, title: String, content: String, movie_id: Opt
         })
 }
 
+// handles new post creation
 #[post("/post", format="json", data="<body>")]
 pub async fn post(bearer: auth::bearer::Bearer<'_>, body: Json<model::post::FeedPostRequest>) -> (Status, (ContentType, String)) {
     if !auth::bearer::match_sub(bearer, body.author_id).await {
@@ -244,7 +252,6 @@ pub async fn post(bearer: auth::bearer::Bearer<'_>, body: Json<model::post::Feed
     }
 
     let ret;
-    
     match body.movie_id {
         Some(m_id) => {
             let cnt = get_review_count(body.author_id, m_id).await;
@@ -261,6 +268,7 @@ pub async fn post(bearer: auth::bearer::Bearer<'_>, body: Json<model::post::Feed
                     reason: String::from("Database insertion failed")
                 }).to_string()));
             } else {
+                // make a new post
                 ret = make_post(body.author_id, body.title.clone(), body.content.clone(), body.movie_id, body.movie_name.clone()).await;
             }
         }
@@ -282,6 +290,7 @@ pub async fn post(bearer: auth::bearer::Bearer<'_>, body: Json<model::post::Feed
     }
 }
 
+// get a post from a post id
 async fn get_post_from_id(post_id: i32) -> model::post::Post {
     sqlx::query_as!(
         model::post::Post,
@@ -296,6 +305,7 @@ async fn get_post_from_id(post_id: i32) -> model::post::Post {
         })
 }
 
+// get a post from a post id
 #[post("/getPost", format="json", data="<body>")]
 pub async fn get_post(_bearer: auth::bearer::Bearer<'_>, body: Json<model::post::PostIdRequest>) -> (Status, (ContentType, String)) {
     let ret = get_post_from_id(body.post_id).await;
@@ -312,6 +322,7 @@ pub async fn get_post(_bearer: auth::bearer::Bearer<'_>, body: Json<model::post:
     }).to_string()))
 }
 
+// edit a post
 #[post("/editPost", format="json", data="<body>")]
 pub async fn edit_post(bearer: auth::bearer::Bearer<'_>, body: Json<model::post::EditFeedPostRequest>) -> (Status, (ContentType, String)) {
     let ret = get_post_from_id(body.post_id).await;
@@ -351,6 +362,7 @@ pub async fn edit_post(bearer: auth::bearer::Bearer<'_>, body: Json<model::post:
     }).to_string()))
 }
 
+// delete a post
 #[post("/deletePost", format="json", data="<body>")]
 pub async fn delete_post(bearer: auth::bearer::Bearer<'_>, body: Json<model::post::PostIdRequest>) -> (Status, (ContentType, String)) {
     let ret = get_post_from_id(body.post_id).await;
@@ -390,8 +402,7 @@ pub async fn delete_post(bearer: auth::bearer::Bearer<'_>, body: Json<model::pos
     }).to_string()))
 }
 
-///////////////////////////////////////
-
+// get comments for a given post
 #[post("/comments", format="json", data="<body>")]
 pub async fn comments(_bearer: auth::bearer::Bearer<'_>, body: Json<model::comment::CommentsFromPostRequest>) -> (Status, (ContentType, String)) {
     let res = sqlx::query_as!(
@@ -412,6 +423,7 @@ pub async fn comments(_bearer: auth::bearer::Bearer<'_>, body: Json<model::comme
     }).to_string()))
 }
 
+// insert a new comment in the database
 async fn make_comment(author_id: i32, content: String, post_id: i32) -> model::user::DbInt {
     let ret = get_post_from_id(post_id).await;
     if ret.id != -1 && author_id != ret.author_id{
@@ -429,6 +441,7 @@ async fn make_comment(author_id: i32, content: String, post_id: i32) -> model::u
         })
 }
 
+// make a new comment
 #[post("/comment", format="json", data="<body>")]
 pub async fn comment(bearer: auth::bearer::Bearer<'_>, body: Json<model::comment::CommentRequest>) -> (Status, (ContentType, String)) {
     if !auth::bearer::match_sub(bearer, body.author_id).await {
@@ -439,7 +452,6 @@ pub async fn comment(bearer: auth::bearer::Bearer<'_>, body: Json<model::comment
     }
 
     let ret;
-    
     ret = make_comment(body.author_id, body.content.clone(), body.post_id).await;
 
     if ret.cnt != body.author_id {
@@ -455,6 +467,7 @@ pub async fn comment(bearer: auth::bearer::Bearer<'_>, body: Json<model::comment
     }
 }
 
+// get a comment from a comment id
 async fn get_comment_from_id(comment_id: i32) -> model::comment::Comment {
     sqlx::query_as!(
         model::comment::Comment,
@@ -469,6 +482,7 @@ async fn get_comment_from_id(comment_id: i32) -> model::comment::Comment {
         })
 }
 
+// get a comment from a comment id
 #[post("/getComment", format="json", data="<body>")]
 pub async fn get_comment(_bearer: auth::bearer::Bearer<'_>, body: Json<model::comment::CommentIdRequest>) -> (Status, (ContentType, String)) {
     let ret = get_comment_from_id(body.comment_id).await;
@@ -485,6 +499,7 @@ pub async fn get_comment(_bearer: auth::bearer::Bearer<'_>, body: Json<model::co
     }).to_string()))
 }
 
+// edit a comment
 #[post("/editComment", format="json", data="<body>")]
 pub async fn edit_comment(bearer: auth::bearer::Bearer<'_>, body: Json<model::comment::EditCommentRequest>) -> (Status, (ContentType, String)) {
     let ret = get_comment_from_id(body.comment_id).await;
@@ -524,6 +539,7 @@ pub async fn edit_comment(bearer: auth::bearer::Bearer<'_>, body: Json<model::co
     }).to_string()))
 }
 
+// delete a comment
 #[post("/deleteComment", format="json", data="<body>")]
 pub async fn delete_comment(bearer: auth::bearer::Bearer<'_>, body: Json<model::comment::CommentIdRequest>) -> (Status, (ContentType, String)) {
     let ret = get_comment_from_id(body.comment_id).await;
@@ -563,6 +579,7 @@ pub async fn delete_comment(bearer: auth::bearer::Bearer<'_>, body: Json<model::
     }).to_string()))
 }
 
+// delete a user
 #[post("/deleteUser", format="json", data="<body>")]
 pub async fn delete_user(bearer: auth::bearer::Bearer<'_>, body: Json<model::user::UserIdRequest>) -> (Status, (ContentType, String)) {
     if !auth::bearer::is_admin(bearer).await {
@@ -594,18 +611,7 @@ pub async fn delete_user(bearer: auth::bearer::Bearer<'_>, body: Json<model::use
     }).to_string()))
 }
 
-fn parse_error() -> (Status, (ContentType, String)) {
-    let error_response = json!(model::error::Error{
-        ok: false,
-        reason: String::from("Internal database error!")
-    }).to_string();
-
-    (Status::InternalServerError, (ContentType::JSON, error_response))
-}
-
-/////////////////////////////
-
-
+// get the number of likes for a post
 #[post("/likesPost", format="json", data="<body>")]
 pub async fn likes_post(_bearer: auth::bearer::Bearer<'_>, body: Json<model::like::PostLikeRequest>) -> (Status, (ContentType, String)) {
     let res = sqlx::query_as!(
@@ -625,6 +631,7 @@ pub async fn likes_post(_bearer: auth::bearer::Bearer<'_>, body: Json<model::lik
     }).to_string()))
 }
 
+// insert a new like in the database
 async fn make_post_like(author_id: i32, post_id: i32) -> model::user::DbInt {
     let ret = get_post_from_id(post_id).await;
     if ret.id != -1 && author_id != ret.author_id{
@@ -642,6 +649,7 @@ async fn make_post_like(author_id: i32, post_id: i32) -> model::user::DbInt {
         })
 }
 
+// like a post
 #[post("/likePost", format="json", data="<body>")]
 pub async fn like_post(bearer: auth::bearer::Bearer<'_>, body: Json<model::like::PostLikedRequest>) -> (Status, (ContentType, String)) {
     if !auth::bearer::match_sub(bearer, body.author_id).await {
@@ -668,6 +676,7 @@ pub async fn like_post(bearer: auth::bearer::Bearer<'_>, body: Json<model::like:
     }
 }
 
+// get a particular post like
 async fn get_post_like_from_id(post_id: i32, author_id: i32) -> i64 {
     let ret = sqlx::query_as!(
         model::user::DbCount,
@@ -683,6 +692,7 @@ async fn get_post_like_from_id(post_id: i32, author_id: i32) -> i64 {
     return ret.cnt
 }
 
+// get a particular post like
 #[post("/getLikePost", format="json", data="<body>")]
 pub async fn get_like_post(_bearer: auth::bearer::Bearer<'_>, body: Json<model::like::PostLikedRequest>) -> (Status, (ContentType, String)) {
     let ret = get_post_like_from_id(body.post_id, body.author_id).await;
@@ -699,6 +709,7 @@ pub async fn get_like_post(_bearer: auth::bearer::Bearer<'_>, body: Json<model::
     }).to_string()))
 }
 
+// unwind a post like
 #[post("/deleteLikePost", format="json", data="<body>")]
 pub async fn delete_like_post(bearer: auth::bearer::Bearer<'_>, body: Json<model::like::PostLikedRequest>) -> (Status, (ContentType, String)) {
     let ret = get_post_like_from_id(body.post_id, body.author_id).await;
@@ -738,9 +749,7 @@ pub async fn delete_like_post(bearer: auth::bearer::Bearer<'_>, body: Json<model
     }).to_string()))
 }
 
-///////////////////////////////
-
-
+// get the number of likes for a comment
 #[post("/likesComment", format="json", data="<body>")]
 pub async fn likes_comment(_bearer: auth::bearer::Bearer<'_>, body: Json<model::like::CommentLikeRequest>) -> (Status, (ContentType, String)) {
     let res = sqlx::query_as!(
@@ -760,6 +769,7 @@ pub async fn likes_comment(_bearer: auth::bearer::Bearer<'_>, body: Json<model::
     }).to_string()))
 }
 
+// insert a new comment like in the database
 async fn make_comment_like(author_id: i32, comment_id: i32) -> model::user::DbInt {
     let ret = get_comment_from_id(comment_id).await;
     if ret.id != -1 && author_id != ret.author_id{
@@ -777,6 +787,7 @@ async fn make_comment_like(author_id: i32, comment_id: i32) -> model::user::DbIn
         })
 }
 
+// like a comment
 #[post("/likeComment", format="json", data="<body>")]
 pub async fn like_comment(bearer: auth::bearer::Bearer<'_>, body: Json<model::like::CommentLikedRequest>) -> (Status, (ContentType, String)) {
     if !auth::bearer::match_sub(bearer, body.author_id).await {
@@ -803,6 +814,7 @@ pub async fn like_comment(bearer: auth::bearer::Bearer<'_>, body: Json<model::li
     }
 }
 
+// get a particular comment like
 async fn get_comment_like_from_id(comment_id: i32, author_id: i32) -> i64 {
     let ret = sqlx::query_as!(
         model::user::DbCount,
@@ -818,6 +830,7 @@ async fn get_comment_like_from_id(comment_id: i32, author_id: i32) -> i64 {
     return ret.cnt
 }
 
+// get a particular comment like
 #[post("/getLikeComment", format="json", data="<body>")]
 pub async fn get_like_comment(_bearer: auth::bearer::Bearer<'_>, body: Json<model::like::CommentLikedRequest>) -> (Status, (ContentType, String)) {
     let ret = get_comment_like_from_id(body.comment_id, body.author_id).await;
@@ -834,6 +847,7 @@ pub async fn get_like_comment(_bearer: auth::bearer::Bearer<'_>, body: Json<mode
     }).to_string()))
 }
 
+// unwind a comment like
 #[post("/deleteLikeComment", format="json", data="<body>")]
 pub async fn delete_like_comment(bearer: auth::bearer::Bearer<'_>, body: Json<model::like::CommentLikedRequest>) -> (Status, (ContentType, String)) {
     let ret = get_comment_like_from_id(body.comment_id, body.author_id).await;
@@ -873,6 +887,7 @@ pub async fn delete_like_comment(bearer: auth::bearer::Bearer<'_>, body: Json<mo
     }).to_string()))
 }
 
+// construct the leaderboard
 #[get("/leaderboard")]
 pub async fn get_leaderboard() -> (Status, (ContentType, String)) {
     let res = sqlx::query_as!(
@@ -915,11 +930,7 @@ pub async fn get_leaderboard() -> (Status, (ContentType, String)) {
         }).to_string()))
 }
 
-// Augment the response with status code and content type
-fn success_response(serialized_json: String) -> (Status, (ContentType, String)) {
-    (Status::Accepted, (ContentType::JSON, serialized_json))
-}
-
+// insert a new notification in the database
 async fn make_notification(user_id: i32, message: String,post_id :i32) -> model::user::DbInt
 {
     sqlx::query_as!(
@@ -932,6 +943,27 @@ async fn make_notification(user_id: i32, message: String,post_id :i32) -> model:
         })
 }
 
+// get all notifications for a given user
+#[post("/getNotification", format="json", data="<body>")]
+pub async fn get_notification(_bearer: auth::bearer::Bearer<'_>,body: Json<model::user::NotificationRequest>) -> (Status, (ContentType, String)) {
+    let res = sqlx::query_as!(
+        model::user::Notification,
+        r#"SELECT notification_id AS "notification_id!",message AS "message!",post_id AS "post_id!"
+            FROM notification
+            WHERE user_id = $1"#,
+            body.user_id
+        ).fetch_all(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
+            error!("Couldn't read data! {}", e);
+            Vec::new()
+        });
+    
+    (Status::Accepted, (ContentType::JSON, json!(model::user::NotificationResponse{
+        ok: true,
+        results: res
+    }).to_string()))
+}
+
+// delete a notification
 #[post("/deleteNotification", format="json", data="<body>")]
 pub async fn delete_notification(_bearer: auth::bearer::Bearer<'_>,body: Json<model::user::NotificationDelete>) -> (Status, (ContentType, String)) {
     let res = sqlx::query_as!(
@@ -956,22 +988,17 @@ pub async fn delete_notification(_bearer: auth::bearer::Bearer<'_>,body: Json<mo
     }).to_string()))
 }
 
-#[post("/getNotification", format="json", data="<body>")]
-pub async fn get_notification(_bearer: auth::bearer::Bearer<'_>,body: Json<model::user::NotificationRequest>) -> (Status, (ContentType, String)) {
-    
-    let res = sqlx::query_as!(
-        model::user::Notification,
-        r#"SELECT notification_id AS "notification_id!",message AS "message!",post_id AS "post_id!"
-            FROM notification
-            WHERE user_id = $1"#,
-            body.user_id
-        ).fetch_all(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
-            error!("Couldn't read data! {}", e);
-            Vec::new()
-        });
-    
-    (Status::Accepted, (ContentType::JSON, json!(model::user::NotificationResponse{
-        ok: true,
-        results: res
-    }).to_string()))
+// augment the response with status code and content type
+fn success_response(serialized_json: String) -> (Status, (ContentType, String)) {
+    (Status::Accepted, (ContentType::JSON, serialized_json))
+}
+
+// return a generic 500 error
+fn parse_error() -> (Status, (ContentType, String)) {
+    let error_response = json!(model::error::Error{
+        ok: false,
+        reason: String::from("Internal database error!")
+    }).to_string();
+
+    (Status::InternalServerError, (ContentType::JSON, error_response))
 }

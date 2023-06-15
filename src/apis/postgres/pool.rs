@@ -1,6 +1,7 @@
 use sqlx::{Postgres, Pool, postgres::PgPoolOptions};
 use async_once::AsyncOnce;
 
+// load and cache the database connection
 lazy_static!{
     #[derive(Debug)]
     pub static ref PG: AsyncOnce<Pool<Postgres>> = AsyncOnce::new(async {

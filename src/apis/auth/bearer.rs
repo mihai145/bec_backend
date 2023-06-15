@@ -4,7 +4,6 @@ use rocket::request::{Outcome, Request, FromRequest};
 use jsonwebtoken::{decode, Algorithm, Validation, DecodingKey};
 
 use crate::apis::auth::models;
-
 use super::public_key::AUTH0_PKEY;
 
 #[derive(Debug, Clone, Copy)]
@@ -20,10 +19,13 @@ pub enum BearerError {
 impl<'r> FromRequest<'r> for Bearer<'r> {
     type Error = BearerError;
 
+    // authenticate a request
     async fn from_request(req: &'r Request<'_>) -> Outcome<Self, Self::Error> {
+        // check that the request has a authentication header
         match req.headers().get_one("bearer") {
             None => Outcome::Failure((Status::BadRequest, BearerError::Missing)),
             Some(bearer) => {
+                // get the public key of the authorization server
                 let public_key = AUTH0_PKEY.get().await;
                 let (n, e);
 
@@ -38,6 +40,7 @@ impl<'r> FromRequest<'r> for Bearer<'r> {
                     }
                 }
 
+                // decode the token
                 let token = decode::<models::Claims>(&bearer, 
                     &DecodingKey::from_rsa_components(n.as_ref(), e.as_ref()).unwrap(), 
                     &Validation::new(Algorithm::RS256));
@@ -56,7 +59,9 @@ impl<'r> FromRequest<'r> for Bearer<'r> {
     }
 }
 
+// check that the bearer of the token matches a user id
 pub async fn match_sub(bearer: Bearer<'_>, id: i32) -> bool {
+    // get the public key of the authorization server
     let public_key = AUTH0_PKEY.get().await;
     let (n, e);
 
@@ -71,12 +76,14 @@ pub async fn match_sub(bearer: Bearer<'_>, id: i32) -> bool {
         }
     }
 
+    // decode the token
     let token = decode::<models::Claims>(&bearer.0, 
         &DecodingKey::from_rsa_components(n.as_ref(), e.as_ref()).unwrap(), 
         &Validation::new(Algorithm::RS256));
 
     match token {
         Ok(token) => {
+            // check the user id
             if token.claims.sub.strip_prefix("auth0|").unwrap() == id.to_string() {
                 return true
             }
@@ -89,7 +96,9 @@ pub async fn match_sub(bearer: Bearer<'_>, id: i32) -> bool {
     }
 }
 
+// check that the bearer of the token is an admin
 pub async fn is_admin(bearer: Bearer<'_>) -> bool {
+    // get the public key of the authorization server
     let public_key = AUTH0_PKEY.get().await;
     let (n, e);
 
@@ -104,12 +113,14 @@ pub async fn is_admin(bearer: Bearer<'_>) -> bool {
         }
     }
 
+    // decode the token
     let token = decode::<models::Claims>(&bearer.0, 
         &DecodingKey::from_rsa_components(n.as_ref(), e.as_ref()).unwrap(), 
         &Validation::new(Algorithm::RS256));
 
     match token {
         Ok(token) => {
+            // check the user role
             if token.claims.https_example_com_role == "admin" {
                 return true
             }

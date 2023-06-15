@@ -4,6 +4,7 @@ use rocket::serde::json::Json;
 use serde_json::json;
 use async_once::AsyncOnce;
 
+// load and cache the openai api key
 lazy_static! {
     #[derive(Debug)]
     pub static ref OPEN_AI_KEY: AsyncOnce<String> = AsyncOnce::new(async {
@@ -14,10 +15,10 @@ lazy_static! {
     });
 }
 
+// get movie recommendations from openai and return a curated list to the user
 #[post("/askGPT", format = "json", data = "<body>")]
 pub async fn ask_gpt(body: Json<model::openai::RecommandationRequest>) -> (Status, (ContentType, String)) {
-
-    // Create the MovieRecommendationRequest object
+    // create the MovieRecommendationRequest object
     let movie_request = model::openai::MovieRecommendationRequest {
         model: "gpt-3.5-turbo".to_string(),
         messages: vec![
@@ -28,6 +29,7 @@ pub async fn ask_gpt(body: Json<model::openai::RecommandationRequest>) -> (Statu
         ],
     };
 
+    // fire the request with the appropiate headers
     let client = reqwest::Client::new();
     let api_result = client
     .post("https://api.openai.com/v1/chat/completions")
@@ -37,12 +39,12 @@ pub async fn ask_gpt(body: Json<model::openai::RecommandationRequest>) -> (Statu
     .await
     .unwrap();
 
-
+    // interpret the results
     match api_result.json::<model::openai::ChatCompletionResponse>().await {
         Ok(parsed) => {
             let choices = parsed.choices;
 
-            // Extract movie names from choices
+            // extract movie names from choices
             let mut movie_names: Vec<String> = vec![];
             for choice in choices {
                 let content = choice.message.content;

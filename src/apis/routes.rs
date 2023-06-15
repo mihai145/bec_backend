@@ -1,3 +1,5 @@
+// constants for route prefixes
+
 pub const ROOT: &str = "/";
 pub const SEARCH_MOVIE_NAME: &str = "/search/movieName";
 pub const SEARCH_MOVIE_ID: &str = "/search/movieId";

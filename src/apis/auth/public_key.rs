@@ -1,6 +1,7 @@
 use async_once::AsyncOnce;
 use crate::apis::auth::models;
 
+// download and cache the public key of the authorization server
 lazy_static!{
     #[derive(Debug)]
     pub static ref AUTH0_PKEY: AsyncOnce<Option<models::Key>> = AsyncOnce::new(async {

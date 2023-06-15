@@ -3,9 +3,9 @@ use rocket::http::{Status, ContentType};
 use rocket::serde::json::Json;
 use serde_json::json;
 
-// move this in a Kubernetes secret later
 const MOVIE_DB_API_KEY: &str = "94f0de158bc1f10413f2ac668010303d";
 
+// search a movie by name
 #[post("/search/movieName", format="json", data="<body>")]
 pub async fn search_movie_name(body: Json<model::movie::MovieNameSearchRequest>) -> (Status, (ContentType, String)) {
     let movie_name = &body.movie_name;
@@ -18,8 +18,10 @@ pub async fn search_movie_name(body: Json<model::movie::MovieNameSearchRequest>)
         Ok(parsed) => {
             let mut movies = parsed.results;
             
+            // discard "dirty" results
             movies = movies.iter().filter(|x| x.overview.len() > 0).cloned().collect();
 
+            // augment image paths with the image path prefix
             for movie in &mut movies {
                 augment_image_paths_movie(movie);
             }
@@ -33,6 +35,7 @@ pub async fn search_movie_name(body: Json<model::movie::MovieNameSearchRequest>)
     }
 }
 
+// search a movie by id
 #[post("/search/movieId", format="json", data="<body>")]
 pub async fn search_movie_id(body: Json<model::movie::MovieIdSearchRequest>) -> (Status, (ContentType, String)) {
     let movie_id = &body.movie_id;
@@ -44,6 +47,8 @@ pub async fn search_movie_id(body: Json<model::movie::MovieIdSearchRequest>) -> 
     match api_result.json::<model::movie::DetailedMovie>().await {
         Ok(parsed) => {
             let mut movie = parsed;
+
+            // augment image paths with the image path prefix
             augment_image_paths_detailed_movie(&mut movie);
 
             success_response(json!(model::movie::MovieIdSearchResponse{
@@ -55,6 +60,7 @@ pub async fn search_movie_id(body: Json<model::movie::MovieIdSearchRequest>) -> 
     }
 }
 
+// search an actor by name
 #[post("/search/actorName", format="json", data="<body>")]
 pub async fn search_actor_name(body: Json<model::actor::ActorNameSearchRequest>) -> (Status, (ContentType, String)) {
     let actor_name = &body.actor_name;
@@ -67,10 +73,12 @@ pub async fn search_actor_name(body: Json<model::actor::ActorNameSearchRequest>)
         Ok(parsed) => {
             let mut actors = parsed.results;
 
+            // discard "dirty" results
             actors = actors.iter().filter(|x| x.known_for.len() > 0 
                             && x.name.len() > 0 
                             && x.name.chars().all(|c| !c.is_ascii_digit())).cloned().collect();
 
+            // augment image paths with the image path prefix
             for actor in &mut actors {
                 for movie in &mut actor.known_for {
                     augment_image_paths_known_for(movie);
@@ -87,6 +95,7 @@ pub async fn search_actor_name(body: Json<model::actor::ActorNameSearchRequest>)
     }
 }
 
+// search an actor by id
 #[post("/search/actorId", format="json", data="<body>")]
 pub async fn search_actor_id(body: Json<model::actor::ActorIdSearchRequest>) -> (Status, (ContentType, String)) {
     let actor_id = &body.actor_id;
@@ -97,6 +106,7 @@ pub async fn search_actor_id(body: Json<model::actor::ActorIdSearchRequest>) -> 
     
     match api_result.json::<model::actor::DetailedActor>().await {
         Ok(mut parsed) => {
+            // augment image paths with the image path prefix
             augment_profile_path_detailed_actor(&mut parsed);
 
             success_response(json!(model::actor::ActorIdSearchResponse{
@@ -108,6 +118,7 @@ pub async fn search_actor_id(body: Json<model::actor::ActorIdSearchRequest>) -> 
     }
 }
 
+// get all available genres
 #[get("/genres")]
 pub async fn get_genres() -> (Status, (ContentType, String)) {
     let api_result = reqwest
@@ -125,6 +136,7 @@ pub async fn get_genres() -> (Status, (ContentType, String)) {
     }
 }
 
+// get all trending movies in a given genre
 #[post("/trending", format="json", data="<body>")]
 pub async fn get_trending(body: Json<model::genre::TrendingSearchRequest>) -> (Status, (ContentType, String)) {
     let genre_id = &body.genre_id;
@@ -138,6 +150,7 @@ pub async fn get_trending(body: Json<model::genre::TrendingSearchRequest>) -> (S
             let mut filtered_movies = Vec::new();
             for movie in &mut parsed.results {
                 if movie.genre_ids.contains(genre_id) {
+                    // augment image paths with the image path prefix
                     augment_image_paths_trending_movie(movie);
                     filtered_movies.push(movie.clone());
                 }

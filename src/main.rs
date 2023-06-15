@@ -3,6 +3,7 @@
 
 mod apis;
 
+// simple "hello world" endpoints used for testing connectivity
 #[get("/")]
 fn index() -> &'static str {
     "Hello, BEC!"
@@ -15,6 +16,7 @@ fn hello(str: String) -> String {
 
 #[launch]
 fn rocket() -> _ {
+    // register all endpoints and start the server
     rocket::build().mount(apis::routes::ROOT, routes![index, hello])
                     .mount(apis::routes::ROOT, routes![apis::themoviedb::search_movie_name,
                                                         apis::themoviedb::search_movie_id,
