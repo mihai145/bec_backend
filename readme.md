@@ -21,6 +21,9 @@
 #### Demo
  ...
 
+# Architecture
+![architecure]([https://github.com/[username]/[reponame]/blob/[branch]/image.jpg](https://github.com/mihai145/bec_backend/blob/main/mds-architecture.jpg)?raw=true)
+
 # Commands
 Prepare dependencies: ```cargo chef prepare --recipe-path recipe.json```
 
