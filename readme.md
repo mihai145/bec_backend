@@ -21,6 +21,9 @@
 #### Demo
  ...
 
+# Architecture
+![Architecture](mds-architecture.jpg)
+
 # Commands
 Prepare dependencies: ```cargo chef prepare --recipe-path recipe.json```
 
