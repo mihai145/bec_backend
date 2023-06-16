@@ -43,6 +43,7 @@ fn rocket() -> _ {
                                                         apis::database::like_post,
                                                         apis::database::likes_comment,
                                                         apis::database::likes_post,
+                                                        apis::database::get_num_comments,
                                                         apis::database::get_like_comment,
                                                         apis::database::get_like_post,
                                                         apis::database::delete_like_comment,

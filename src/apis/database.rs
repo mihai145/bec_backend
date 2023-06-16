@@ -462,6 +462,19 @@ pub async fn get_comment(_bearer: auth::bearer::Bearer<'_>, body: Json<model::co
     }).to_string()))
 }
 
+//get number of comments of a certain post
+async fn get_num_comments(post_id: i32) -> model::user::DbInt {
+    sqlx::query_as!(
+        model::user::DbInt,
+        r#"SELECT COUNT(*) AS "cnt!" FROM comment WHERE post_id = $1"#,
+        post_id
+        ).fetch_one(&*(postgres::pool::PG.get().await)).await.unwrap_or_else(|e| {
+            error!("Couldn't read data! {}", e);
+            model::user::DbInt{cnt: 0}
+        })
+}
+
+
 #[post("/editComment", format="json", data="<body>")]
 pub async fn edit_comment(bearer: auth::bearer::Bearer<'_>, body: Json<model::comment::EditCommentRequest>) -> (Status, (ContentType, String)) {
     let ret = get_comment_from_id(body.comment_id).await;
