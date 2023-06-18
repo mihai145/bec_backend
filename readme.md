@@ -16,10 +16,10 @@
  https://trello.com/invite/b/j2L9dYsv/ATTIf0a5d39020a8d9751abf85adb7a40ad251B5AF4F/bec-film-app
 
 #### Diagrama
- ...
+ ![Diagrama](mds-diagrama.jpeg)
 
 #### Demo
- ...
+https://drive.google.com/file/d/1QQfYWVcuEYvx3iyTuMBQN0iMvNZaaBW4/view?usp=sharing
 
 # Architecture
 ![Architecture](mds-architecture.jpg)
